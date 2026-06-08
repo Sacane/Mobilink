@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo new *)",
+      "Bash(cargo build *)"
+    ]
+  }
+}

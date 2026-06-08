@@ -1,0 +1,1 @@
+C:\Users\johan\Documents\dev\Mobilink\target\debug\libmobilink_core.rlib: C:\Users\johan\Documents\dev\Mobilink\mobilink-core\src\config.rs C:\Users\johan\Documents\dev\Mobilink\mobilink-core\src\lib.rs C:\Users\johan\Documents\dev\Mobilink\mobilink-core\src\message.rs C:\Users\johan\Documents\dev\Mobilink\mobilink-core\src\session.rs

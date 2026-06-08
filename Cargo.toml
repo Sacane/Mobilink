@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "mobilink-core",
+    "mobilink-server",
+    "mobilink-cli",
+]
+resolver = "2"
