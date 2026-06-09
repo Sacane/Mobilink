@@ -1,5 +1,6 @@
 use mobilink_core::session::{Session, SessionId};
 
+pub mod dispatcher;
 pub mod forwarder;
 pub mod registry;
 pub mod router;
@@ -34,6 +35,23 @@ pub trait HttpRouter: Send + Sync {
     /// Given a URL path (e.g. "/s/abc123"), returns the matching active session.
     /// Returns None if the path doesn't match or the session doesn't exist.
     fn resolve_session(&self, path: &str) -> Option<Session>;
+}
+
+/// Handles a single end-to-end request: resolves the session from the URL path,
+/// forwards the raw HTTP request through the tunnel, and returns the raw HTTP response.
+pub trait RequestPipeline: Send + Sync {
+    /// Processes an inbound HTTP request for the given URL path.
+    /// Returns the raw HTTP response bytes, or an error if routing or forwarding failed.
+    fn handle(&self, path: &str, request: &[u8]) -> Result<Vec<u8>, PipelineError>;
+}
+
+/// Reason why the request pipeline failed to process a request.
+#[derive(Debug, PartialEq)]
+pub enum PipelineError {
+    /// No active session matched the URL path.
+    SessionNotFound,
+    /// The tunnel for the matched session is unavailable.
+    ForwardFailed(ForwardError),
 }
 
 /// Represents the server's ability to manage tunnel sessions.
@@ -311,5 +329,66 @@ mod tests {
 
         // Then: it returns NotFound
         assert_eq!(result, Err(SessionError::NotFound));
+    }
+
+    // --- Stub pipeline ---
+
+    struct StubRequestPipeline {
+        router: StubHttpRouter,
+        forwarder: SpyForwarder,
+    }
+
+    impl RequestPipeline for StubRequestPipeline {
+        fn handle(&self, path: &str, request: &[u8]) -> Result<Vec<u8>, PipelineError> {
+            let session = self.router.resolve_session(path)
+                .ok_or(PipelineError::SessionNotFound)?;
+            self.forwarder.forward(&session, request)
+                .map_err(PipelineError::ForwardFailed)
+        }
+    }
+
+    #[test]
+    fn server_relays_response_from_developer_server_to_mobile_browser() {
+        // Given: a session is active and its tunnel is connected
+        let registry = Arc::new(StubSessionRegistry::new());
+        let session = registry.open_session(3000).expect("Expected a session");
+        let path = format!("/s/{}", session.id);
+
+        let forwarder = SpyForwarder::new();
+        forwarder.register_tunnel(session.id.clone()); // tunnel is live
+
+        let pipeline = StubRequestPipeline {
+            router: StubHttpRouter { registry: Arc::clone(&registry) },
+            forwarder,
+        };
+
+        // When: the mobile browser sends a GET request
+        let request = b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let result = pipeline.handle(&path, request);
+
+        // Then: the pipeline returns the response from the developer's local server
+        assert!(result.is_ok(), "Expected a response, got: {:?}", result);
+        assert_eq!(
+            result.unwrap(),
+            b"HTTP/1.1 200 OK\r\n\r\n".to_vec(),
+            "Response body should match what the developer server sent"
+        );
+    }
+
+    #[test]
+    fn server_returns_session_not_found_when_path_is_unknown() {
+        // Given: no session exists for this path
+        let registry = Arc::new(StubSessionRegistry::new());
+        let pipeline = StubRequestPipeline {
+            router: StubHttpRouter { registry },
+            forwarder: SpyForwarder::new(),
+        };
+
+        // When: a request arrives for an unknown path
+        let request = b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let result = pipeline.handle("/s/doesnotexist", request);
+
+        // Then: the pipeline signals that no session matched
+        assert_eq!(result, Err(PipelineError::SessionNotFound));
     }
 }
