@@ -16,13 +16,9 @@ impl Default for ServerConfig {
     }
 }
 
-/// Configuration for the CLI, provided via command-line arguments.
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
-    /// Local port to expose through the tunnel.
     pub local_port: u16,
-    /// Address of the Mobilink server to connect to.
     pub server_addr: String,
-    /// Whether to disable automatic Eruda injection.
     pub no_eruda: bool,
 }
