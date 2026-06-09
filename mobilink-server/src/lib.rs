@@ -2,6 +2,7 @@ use mobilink_core::session::{Session, SessionId};
 
 pub mod dispatcher;
 pub mod forwarder;
+pub mod handshake;
 pub mod registry;
 pub mod router;
 
@@ -35,6 +36,21 @@ pub trait HttpRouter: Send + Sync {
     /// Given a URL path (e.g. "/s/abc123"), returns the matching active session.
     /// Returns None if the path doesn't match or the session doesn't exist.
     fn resolve_session(&self, path: &str) -> Option<Session>;
+}
+
+/// Processes the QUIC handshake when a CLI connects.
+/// Receives the developer's local port, opens a session, and returns the server confirmation.
+pub trait TunnelHandshakeHandler: Send + Sync {
+    /// Called when a CLI sends `ClientMessage::Hello { local_port }`.
+    /// Opens a session in the registry and returns the `SessionCreated` response.
+    fn handle_hello(&self, local_port: u16) -> Result<mobilink_core::message::ServerMessage, HandshakeError>;
+}
+
+/// Reason why the handshake could not be completed.
+#[derive(Debug, PartialEq)]
+pub enum HandshakeError {
+    /// The session registry refused to create a new session.
+    SessionCreationFailed,
 }
 
 /// Handles a single end-to-end request: resolves the session from the URL path,
@@ -331,6 +347,23 @@ mod tests {
         assert_eq!(result, Err(SessionError::NotFound));
     }
 
+    // --- Stub handshake handler ---
+
+    struct StubHandshakeHandler {
+        registry: Arc<StubSessionRegistry>,
+    }
+
+    impl TunnelHandshakeHandler for StubHandshakeHandler {
+        fn handle_hello(&self, local_port: u16) -> Result<mobilink_core::message::ServerMessage, HandshakeError> {
+            let session = self.registry.open_session(local_port)
+                .ok_or(HandshakeError::SessionCreationFailed)?;
+            Ok(mobilink_core::message::ServerMessage::SessionCreated {
+                session_id: session.id,
+                public_url: session.public_url,
+            })
+        }
+    }
+
     // --- Stub pipeline ---
 
     struct StubRequestPipeline {
@@ -344,6 +377,30 @@ mod tests {
                 .ok_or(PipelineError::SessionNotFound)?;
             self.forwarder.forward(&session, request)
                 .map_err(PipelineError::ForwardFailed)
+        }
+    }
+
+    #[test]
+    fn server_creates_a_session_when_cli_announces_its_port() {
+        // Given: the server is ready to accept tunnel connections
+        let registry = Arc::new(StubSessionRegistry::new());
+        let handler = StubHandshakeHandler { registry };
+
+        // When: the CLI announces it wants to expose port 3000
+        let result = handler.handle_hello(3000);
+
+        // Then: the server responds with a session ID and a public URL
+        assert!(result.is_ok(), "Expected a SessionCreated response, got: {:?}", result);
+        match result.unwrap() {
+            mobilink_core::message::ServerMessage::SessionCreated { session_id, public_url } => {
+                assert!(!session_id.to_string().is_empty(), "Session ID should not be empty");
+                assert!(
+                    public_url.contains(&session_id.to_string()),
+                    "Public URL '{}' should contain the session ID '{}'",
+                    public_url, session_id
+                );
+            }
+            other => panic!("Expected SessionCreated, got {:?}", other),
         }
     }
 
