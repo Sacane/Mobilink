@@ -8,6 +8,7 @@ Mobilink is a self-hosted, mobile-first network tunnel that exposes localhost vi
 
 See [doc/PLAN.md](doc/PLAN.md) for the full architecture and roadmap.
 See [doc/README.md](doc/README.md) for the official project documentation.
+See [doc/TDD.md](doc/TDD.md) for the mandatory TDD rules every agent must follow.
 
 ## Workspace structure
 
@@ -75,6 +76,16 @@ cargo fmt --all
 Mobilink is **self-hosted by default**. The developer runs `mobilink-server` on their own VPS or server. There is no dependency on any Mobilink-operated cloud infrastructure. The CLI takes a `--server` flag to point at any host.
 
 A Mobilink-operated cloud mode may be added later as a layer on top of the same architecture — do not design around it now.
+
+## TDD — Non-negotiable rule
+
+**Every feature must follow the Red → Green → Refactor cycle defined in [doc/TDD.md](doc/TDD.md).**
+
+- 🔴 Write a failing test that expresses business intent before any implementation
+- 🟢 Write the minimum code to make it pass
+- 🔵 Refactor without changing behaviour
+
+No implementation code without a prior failing test. No exceptions.
 
 ## Scope constraints (MVP)
 
