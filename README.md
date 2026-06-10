@@ -72,26 +72,34 @@ The server is an **intelligent HTTP proxy**: it understands the traffic passing 
 
 ## Quick start
 
-### 1. Install the server on your VPS
+### 1. Build the binaries
 
 ```bash
-curl -fsSL https://get.mobilink.dev | sh
-mobilink-server --domain my-vps.com
+cargo build --release
+# → target/release/mobilink-server  and  target/release/mobilink
 ```
 
-### 2. Install the CLI on your machine
+### 2. Start the server on your VPS
 
 ```bash
-curl -fsSL https://get.mobilink.dev/cli | sh
+MOBILINK_PUBLIC_URL=http://my-vps.com:8080 ./mobilink-server
 ```
 
-### 3. Start a tunnel
+### 3. Start a tunnel from your machine
 
 ```bash
 mobilink start --port 3000 --server my-vps.com
 ```
 
 Scan the QR code displayed in the terminal from your phone.
+
+---
+
+## Documentation
+
+- **[User guide](doc/USER_GUIDE.md)** — install, run, flags, troubleshooting
+- **[Technical guide](doc/TECHNICAL_GUIDE.md)** — architecture, wire protocol, design choices
+- **[Roadmap](doc/PLAN.md)** · **[TDD rules](doc/TDD.md)** · **[Gherkin scenarios](docs/gherkins/)**
 
 ---
 
@@ -113,7 +121,7 @@ Scan the QR code displayed in the terminal from your phone.
 
 - **Rust** — CLI and server
 - **QUIC via `quinn`** — tunnel protocol
-- **`hyper`** — HTTP proxy on the server side
+- **`axum`** — public HTTP endpoint on the server side
 - **`tokio`** — async runtime
 
 ---

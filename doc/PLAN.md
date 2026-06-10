@@ -89,30 +89,30 @@ A Mobilink-operated cloud mode may be added later as a layer on top of the same 
 ## MVP Roadmap
 
 ### Phase 1 — Foundations
-- [ ] Initialize the Cargo workspace (`mobilink-server`, `mobilink-cli`, `mobilink-core`)
-- [ ] Define shared types in `mobilink-core` (messages, session, config)
+- [x] Initialize the Cargo workspace (`mobilink-server`, `mobilink-cli`, `mobilink-core`)
+- [x] Define shared types in `mobilink-core` (messages, session, config)
 - [ ] Set up CI (build + tests)
 
 ### Phase 2 — QUIC tunnel
-- [ ] Integrate `quinn` server-side: accept QUIC connections
-- [ ] Integrate `quinn` CLI-side: establish a persistent QUIC connection
-- [ ] Handshake protocol: CLI announces itself, server assigns a session ID
-- [ ] Basic TCP forwarding through the QUIC tunnel (not yet HTTP-aware)
+- [x] Integrate `quinn` server-side: accept QUIC connections
+- [x] Integrate `quinn` CLI-side: establish a persistent QUIC connection
+- [x] Handshake protocol: CLI announces itself, server assigns a session ID
+- [x] Basic TCP forwarding through the QUIC tunnel (not yet HTTP-aware)
 
 ### Phase 3 — Public HTTP exposure
-- [ ] Server-side: listen on a public HTTP port per session (or reverse proxy by subdomain)
-- [ ] Route incoming HTTP requests to the correct QUIC tunnel (by session ID)
-- [ ] Generate and display the public URL on the CLI side
+- [x] Server-side: listen on a public HTTP port per session (or reverse proxy by subdomain)
+- [x] Route incoming HTTP requests to the correct QUIC tunnel (by session ID)
+- [x] Generate and display the public URL on the CLI side
 
 ### Phase 4 — QR code & terminal UX
-- [ ] Display the URL QR code in the terminal at session start
-- [ ] Display incoming requests in real time (method, path, status, latency)
-- [ ] Clean Ctrl+C handling (session teardown, resource cleanup)
+- [x] Display the URL QR code in the terminal at session start
+- [x] Display incoming requests in real time (method, path, status, latency)
+- [x] Clean Ctrl+C handling (session teardown, resource cleanup)
 
 ### Phase 5 — Intelligent HTTP proxy
-- [ ] Switch the proxy to HTTP-aware mode (parse requests/responses)
-- [ ] Automatically inject Eruda into `text/html` responses
-- [ ] CLI option to disable injection (`--no-eruda`)
+- [x] Switch the proxy to HTTP-aware mode (parse requests/responses)
+- [x] Automatically inject Eruda into `text/html` responses
+- [x] CLI option to disable injection (`--no-eruda`)
 
 ### Phase 6 — Packaging & distribution
 - [ ] Multi-platform release builds (Linux, macOS, Windows) via `cross`
