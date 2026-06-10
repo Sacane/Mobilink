@@ -3,4 +3,20 @@ name = "mobilink-cli"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "mobilink"
+path = "src/main.rs"
+
 [dependencies]
+mobilink-core = { path = "../mobilink-core" }
+tokio = { version = "1", features = ["full"] }
+quinn = "0.11"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+clap = { version = "4", features = ["derive"] }
+qrcode = { version = "0.14", default-features = false }
+reqwest = { version = "0.12", default-features = false }
+tracing = "0.1"
+
+[dev-dependencies]
+axum = "0.8"
+mobilink-server = { path = "../mobilink-server" }

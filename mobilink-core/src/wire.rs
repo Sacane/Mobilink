@@ -9,6 +9,9 @@
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+/// Maximum size of a single tunnel frame, shared by both ends of the wire.
+pub const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
+
 /// Failure while encoding or decoding a wire message.
 #[derive(Debug)]
 pub struct WireError(pub String);

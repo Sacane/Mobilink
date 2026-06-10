@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Maximum size of a single tunnel frame (32 MiB), matching the HTTP layer.
-pub const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
+pub const MAX_FRAME_BYTES: usize = mobilink_core::wire::MAX_FRAME_BYTES;
 
 /// A live QUIC connection to a developer's CLI, plus its session options.
 struct TunnelEntry {
