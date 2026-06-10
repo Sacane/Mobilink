@@ -14,3 +14,9 @@ Cargo.lock
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code local settings
+.claude/
+
+# Temporary working notes
+HANDOVER.md
