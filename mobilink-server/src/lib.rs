@@ -51,8 +51,10 @@ pub trait SessionOptions: Send + Sync {
 /// rewriting headers, etc.
 pub trait ResponseTransformer: Send + Sync {
     /// Returns the (possibly modified) response to send to the mobile browser.
-    fn transform(&self, response: mobilink_core::http::HttpResponseData)
-        -> mobilink_core::http::HttpResponseData;
+    fn transform(
+        &self,
+        response: mobilink_core::http::HttpResponseData,
+    ) -> mobilink_core::http::HttpResponseData;
 }
 
 /// Processes the QUIC handshake when a CLI connects.
@@ -60,7 +62,10 @@ pub trait ResponseTransformer: Send + Sync {
 pub trait TunnelHandshakeHandler: Send + Sync {
     /// Called when a CLI sends `ClientMessage::Hello { local_port }`.
     /// Opens a session in the registry and returns the `SessionCreated` response.
-    fn handle_hello(&self, local_port: u16) -> Result<mobilink_core::message::ServerMessage, HandshakeError>;
+    fn handle_hello(
+        &self,
+        local_port: u16,
+    ) -> Result<mobilink_core::message::ServerMessage, HandshakeError>;
 }
 
 /// Reason why the handshake could not be completed.
@@ -123,7 +128,9 @@ mod tests {
 
     impl StubSessionRegistry {
         fn new() -> Self {
-            Self { sessions: Mutex::new(HashMap::new()) }
+            Self {
+                sessions: Mutex::new(HashMap::new()),
+            }
         }
     }
 
@@ -142,7 +149,10 @@ mod tests {
         }
 
         fn register_session(&self, session: Session) -> Result<Session, SessionError> {
-            let mut sessions = self.sessions.lock().map_err(|_| SessionError::DuplicateId)?;
+            let mut sessions = self
+                .sessions
+                .lock()
+                .map_err(|_| SessionError::DuplicateId)?;
             if sessions.contains_key(&session.id) {
                 return Err(SessionError::DuplicateId);
             }
@@ -214,7 +224,10 @@ mod tests {
     fn server_opens_a_session_when_developer_announces_a_port() {
         let registry = StubSessionRegistry::new();
         let session = registry.open_session(3000);
-        assert!(session.is_some(), "Expected a session to be opened, but got None");
+        assert!(
+            session.is_some(),
+            "Expected a session to be opened, but got None"
+        );
     }
 
     #[test]
@@ -226,7 +239,8 @@ mod tests {
         assert!(
             session.public_url.contains(&id_str),
             "Public URL '{}' should contain the session ID '{}'",
-            session.public_url, id_str
+            session.public_url,
+            id_str
         );
     }
 
@@ -259,8 +273,13 @@ mod tests {
         };
         let result = registry.register_session(duplicate);
         assert_eq!(result, Err(SessionError::DuplicateId));
-        let still_there = registry.get_session(&existing.id).expect("Original session should still exist");
-        assert_eq!(still_there.local_port, 3000, "Original session should be unchanged");
+        let still_there = registry
+            .get_session(&existing.id)
+            .expect("Original session should still exist");
+        assert_eq!(
+            still_there.local_port, 3000,
+            "Original session should be unchanged"
+        );
     }
 
     #[test]
@@ -326,11 +345,16 @@ mod tests {
         let path = format!("/s/{}", session.id);
 
         // When: a mobile browser sends a request to that URL path
-        let router = StubHttpRouter { registry: Arc::clone(&registry) };
+        let router = StubHttpRouter {
+            registry: Arc::clone(&registry),
+        };
         let resolved = router.resolve_session(&path);
 
         // Then: the server identifies the correct session
-        assert!(resolved.is_some(), "Expected a session to be resolved from the URL");
+        assert!(
+            resolved.is_some(),
+            "Expected a session to be resolved from the URL"
+        );
         assert_eq!(
             resolved.unwrap().id,
             session.id,
@@ -342,13 +366,18 @@ mod tests {
     fn server_returns_nothing_for_unknown_url_path() {
         // Given: no session exists for this path
         let registry = Arc::new(StubSessionRegistry::new());
-        let router = StubHttpRouter { registry: Arc::clone(&registry) };
+        let router = StubHttpRouter {
+            registry: Arc::clone(&registry),
+        };
 
         // When: a mobile browser sends a request to an unknown path
         let resolved = router.resolve_session("/s/unknownid");
 
         // Then: nothing is resolved
-        assert!(resolved.is_none(), "Expected no session for an unknown path");
+        assert!(
+            resolved.is_none(),
+            "Expected no session for an unknown path"
+        );
     }
 
     #[test]
@@ -371,8 +400,13 @@ mod tests {
     }
 
     impl TunnelHandshakeHandler for StubHandshakeHandler {
-        fn handle_hello(&self, local_port: u16) -> Result<mobilink_core::message::ServerMessage, HandshakeError> {
-            let session = self.registry.open_session(local_port)
+        fn handle_hello(
+            &self,
+            local_port: u16,
+        ) -> Result<mobilink_core::message::ServerMessage, HandshakeError> {
+            let session = self
+                .registry
+                .open_session(local_port)
                 .ok_or(HandshakeError::SessionCreationFailed)?;
             Ok(mobilink_core::message::ServerMessage::SessionCreated {
                 session_id: session.id,
@@ -390,9 +424,12 @@ mod tests {
 
     impl RequestPipeline for StubRequestPipeline {
         fn handle(&self, path: &str, request: &[u8]) -> Result<Vec<u8>, PipelineError> {
-            let session = self.router.resolve_session(path)
+            let session = self
+                .router
+                .resolve_session(path)
                 .ok_or(PipelineError::SessionNotFound)?;
-            self.forwarder.forward(&session, request)
+            self.forwarder
+                .forward(&session, request)
                 .map_err(PipelineError::ForwardFailed)
         }
     }
@@ -407,18 +444,25 @@ mod tests {
         let result = handler.handle_hello(3000);
 
         // Then: the server responds with a session ID and a public URL
-        assert!(result.is_ok(), "Expected a SessionCreated response, got: {:?}", result);
-        match result.unwrap() {
-            mobilink_core::message::ServerMessage::SessionCreated { session_id, public_url } => {
-                assert!(!session_id.to_string().is_empty(), "Session ID should not be empty");
-                assert!(
-                    public_url.contains(&session_id.to_string()),
-                    "Public URL '{}' should contain the session ID '{}'",
-                    public_url, session_id
-                );
-            }
-            other => panic!("Expected SessionCreated, got {:?}", other),
-        }
+        assert!(
+            result.is_ok(),
+            "Expected a SessionCreated response, got: {:?}",
+            result
+        );
+        let mobilink_core::message::ServerMessage::SessionCreated {
+            session_id,
+            public_url,
+        } = result.unwrap();
+        assert!(
+            !session_id.to_string().is_empty(),
+            "Session ID should not be empty"
+        );
+        assert!(
+            public_url.contains(&session_id.to_string()),
+            "Public URL '{}' should contain the session ID '{}'",
+            public_url,
+            session_id
+        );
     }
 
     #[test]
@@ -432,7 +476,9 @@ mod tests {
         forwarder.register_tunnel(session.id.clone()); // tunnel is live
 
         let pipeline = StubRequestPipeline {
-            router: StubHttpRouter { registry: Arc::clone(&registry) },
+            router: StubHttpRouter {
+                registry: Arc::clone(&registry),
+            },
             forwarder,
         };
 

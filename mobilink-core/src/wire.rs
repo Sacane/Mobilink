@@ -6,8 +6,8 @@
 //! IS the message boundary. Core stays free of any I/O: these helpers only
 //! transform values to/from bytes.
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 /// Failure while encoding or decoding a wire message.
 #[derive(Debug)]
@@ -40,13 +40,19 @@ mod tests {
 
     #[test]
     fn hello_message_survives_a_wire_roundtrip() {
-        let hello = ClientMessage::Hello { local_port: 3000, no_eruda: true };
+        let hello = ClientMessage::Hello {
+            local_port: 3000,
+            no_eruda: true,
+        };
 
         let bytes = encode(&hello).expect("encoding should succeed");
         let decoded: ClientMessage = decode(&bytes).expect("decoding should succeed");
 
         match decoded {
-            ClientMessage::Hello { local_port, no_eruda } => {
+            ClientMessage::Hello {
+                local_port,
+                no_eruda,
+            } => {
                 assert_eq!(local_port, 3000);
                 assert!(no_eruda);
             }
@@ -65,7 +71,10 @@ mod tests {
         let decoded: ServerMessage = decode(&bytes).expect("decoding should succeed");
 
         match decoded {
-            ServerMessage::SessionCreated { session_id, public_url } => {
+            ServerMessage::SessionCreated {
+                session_id,
+                public_url,
+            } => {
                 assert_eq!(session_id, id);
                 assert!(public_url.contains(&id.to_string()));
             }
@@ -98,6 +107,9 @@ mod tests {
     #[test]
     fn decoding_garbage_bytes_fails_cleanly() {
         let result: Result<HttpRequestData, WireError> = decode(&[0xFF, 0x00, 0x12]);
-        assert!(result.is_err(), "garbage bytes must not decode into a request");
+        assert!(
+            result.is_err(),
+            "garbage bytes must not decode into a request"
+        );
     }
 }

@@ -25,8 +25,13 @@ const MAX_BODY_BYTES: usize = 32 * 1024 * 1024;
 /// Request headers that must not travel through the tunnel.
 /// `accept-encoding` is stripped so the local server replies uncompressed,
 /// which keeps HTML bodies injectable.
-const STRIPPED_REQUEST_HEADERS: [&str; 5] =
-    ["host", "connection", "accept-encoding", "content-length", "transfer-encoding"];
+const STRIPPED_REQUEST_HEADERS: [&str; 5] = [
+    "host",
+    "connection",
+    "accept-encoding",
+    "content-length",
+    "transfer-encoding",
+];
 
 /// Response headers the proxy recomputes itself instead of passing through.
 const STRIPPED_RESPONSE_HEADERS: [&str; 3] = ["content-length", "transfer-encoding", "connection"];
@@ -82,7 +87,10 @@ async fn proxy_handler(State(state): State<ProxyState>, request: Request<Body>) 
     };
 
     let Ok(encoded_request) = wire::encode(&request_data) else {
-        return text_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to encode request.\n");
+        return text_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to encode request.\n",
+        );
     };
 
     // The domain pipeline is synchronous by design (the contract tests are
@@ -171,20 +179,24 @@ mod tests {
 
     impl SpyPipeline {
         fn new(outcome: StubOutcome) -> Arc<Self> {
-            Arc::new(Self { outcome, seen: Mutex::new(None) })
+            Arc::new(Self {
+                outcome,
+                seen: Mutex::new(None),
+            })
         }
     }
 
     impl RequestPipeline for SpyPipeline {
         fn handle(&self, path: &str, request: &[u8]) -> Result<Vec<u8>, PipelineError> {
-            let decoded: HttpRequestData = wire::decode(request).expect("handler sends valid frames");
+            let decoded: HttpRequestData =
+                wire::decode(request).expect("handler sends valid frames");
             *self.seen.lock().unwrap() = Some((path.to_string(), decoded));
             match &self.outcome {
                 StubOutcome::Respond(data) => Ok(wire::encode(data).unwrap()),
                 StubOutcome::SessionMissing => Err(PipelineError::SessionNotFound),
-                StubOutcome::TunnelDown => {
-                    Err(PipelineError::ForwardFailed(ForwardError::TunnelDisconnected))
-                }
+                StubOutcome::TunnelDown => Err(PipelineError::ForwardFailed(
+                    ForwardError::TunnelDisconnected,
+                )),
             }
         }
     }
@@ -212,8 +224,11 @@ mod tests {
     }
 
     fn app(pipeline: Arc<SpyPipeline>, eruda_off: bool) -> Router {
-        let options: Arc<dyn SessionOptions> =
-            if eruda_off { Arc::new(ErudaAlwaysOff) } else { Arc::new(ErudaAlwaysOn) };
+        let options: Arc<dyn SessionOptions> = if eruda_off {
+            Arc::new(ErudaAlwaysOff)
+        } else {
+            Arc::new(ErudaAlwaysOn)
+        };
         public_router(ProxyState {
             pipeline,
             transformer: Arc::new(ErudaInjector),
@@ -247,7 +262,10 @@ mod tests {
         let (status, body) = send(app(Arc::clone(&pipeline), false), &uri).await;
 
         assert_eq!(status, StatusCode::OK);
-        assert!(body.contains("Local app"), "original content must be preserved");
+        assert!(
+            body.contains("Local app"),
+            "original content must be preserved"
+        );
         assert!(body.contains("eruda"), "Eruda must be injected into HTML");
     }
 
@@ -308,6 +326,9 @@ mod tests {
 
         assert_eq!(status, StatusCode::OK);
         assert!(body.contains("Local app"));
-        assert!(!body.contains("eruda"), "--no-eruda must keep the HTML untouched");
+        assert!(
+            !body.contains("eruda"),
+            "--no-eruda must keep the HTML untouched"
+        );
     }
 }

@@ -66,7 +66,10 @@ mod tests {
         HttpResponseData {
             status: 200,
             headers: vec![
-                ("Content-Type".to_string(), "text/html; charset=utf-8".to_string()),
+                (
+                    "Content-Type".to_string(),
+                    "text/html; charset=utf-8".to_string(),
+                ),
                 ("Content-Length".to_string(), body.len().to_string()),
             ],
             body: body.as_bytes().to_vec(),
@@ -110,7 +113,10 @@ mod tests {
 
         let body = String::from_utf8(transformed.body).unwrap();
         assert!(body.contains("eruda"), "Eruda should still be injected");
-        assert!(body.starts_with("<h1>"), "Original content must be preserved");
+        assert!(
+            body.starts_with("<h1>"),
+            "Original content must be preserved"
+        );
     }
 
     #[test]
@@ -129,7 +135,9 @@ mod tests {
     #[test]
     fn leaves_compressed_html_untouched() {
         let mut response = html_response("<html><body></body></html>");
-        response.headers.push(("Content-Encoding".to_string(), "gzip".to_string()));
+        response
+            .headers
+            .push(("Content-Encoding".to_string(), "gzip".to_string()));
 
         let transformed = ErudaInjector.transform(response.clone());
 

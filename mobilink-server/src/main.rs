@@ -12,7 +12,9 @@ use mobilink_core::config::ServerConfig;
 use mobilink_server::dispatcher::RequestDispatcher;
 use mobilink_server::handshake::SessionHandshakeHandler;
 use mobilink_server::http::{ProxyState, public_router};
-use mobilink_server::quic::{QuicTunnelForwarder, TunnelMap, make_server_endpoint, run_tunnel_endpoint};
+use mobilink_server::quic::{
+    QuicTunnelForwarder, TunnelMap, make_server_endpoint, run_tunnel_endpoint,
+};
 use mobilink_server::registry::InMemorySessionRegistry;
 use mobilink_server::router::SessionRouter;
 use mobilink_server::transform::ErudaInjector;
@@ -30,8 +32,7 @@ fn config_from_env() -> ServerConfig {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 

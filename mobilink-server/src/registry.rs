@@ -37,7 +37,10 @@ impl SessionRegistry for InMemorySessionRegistry {
     }
 
     fn register_session(&self, session: Session) -> Result<Session, SessionError> {
-        let mut sessions = self.sessions.lock().map_err(|_| SessionError::DuplicateId)?;
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| SessionError::DuplicateId)?;
         if sessions.contains_key(&session.id) {
             return Err(SessionError::DuplicateId);
         }

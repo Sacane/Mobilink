@@ -43,16 +43,29 @@ fn start_server() -> Harness {
         tunnels.clone(),
     ));
 
-    Harness { registry, tunnels, server_addr, _endpoint: endpoint }
+    Harness {
+        registry,
+        tunnels,
+        server_addr,
+        _endpoint: endpoint,
+    }
 }
 
 /// Plays the CLI side of the handshake and returns the created session info.
 async fn handshake(connection: &quinn::Connection, no_eruda: bool) -> ServerMessage {
     let (mut send, mut recv) = connection.open_bi().await.expect("open handshake stream");
-    let hello = ClientMessage::Hello { local_port: 3000, no_eruda };
-    send.write_all(&wire::encode(&hello).unwrap()).await.expect("send hello");
+    let hello = ClientMessage::Hello {
+        local_port: 3000,
+        no_eruda,
+    };
+    send.write_all(&wire::encode(&hello).unwrap())
+        .await
+        .expect("send hello");
     send.finish().expect("finish hello");
-    let bytes = recv.read_to_end(MAX_FRAME_BYTES).await.expect("read session created");
+    let bytes = recv
+        .read_to_end(MAX_FRAME_BYTES)
+        .await
+        .expect("read session created");
     wire::decode(&bytes).expect("decode session created")
 }
 
@@ -61,8 +74,10 @@ async fn cli_handshake_creates_a_session_with_an_active_tunnel() {
     let server = start_server();
 
     let (connection, _client) = connect_insecure(server.server_addr).await;
-    let ServerMessage::SessionCreated { session_id, public_url } =
-        handshake(&connection, false).await;
+    let ServerMessage::SessionCreated {
+        session_id,
+        public_url,
+    } = handshake(&connection, false).await;
 
     // The session exists in the registry…
     let session = server.registry.get_session(&session_id);
@@ -105,14 +120,21 @@ async fn a_request_frame_travels_through_the_tunnel_and_back() {
                 headers: vec![("Content-Type".to_string(), "text/plain".to_string())],
                 body: b"hello from localhost".to_vec(),
             };
-            send.write_all(&wire::encode(&response).unwrap()).await.unwrap();
+            send.write_all(&wire::encode(&response).unwrap())
+                .await
+                .unwrap();
             send.finish().unwrap();
         }
     });
 
-    let session = server.registry.get_session(&session_id).expect("session exists");
-    let forwarder =
-        Arc::new(QuicTunnelForwarder::new(server.tunnels.clone(), tokio::runtime::Handle::current()));
+    let session = server
+        .registry
+        .get_session(&session_id)
+        .expect("session exists");
+    let forwarder = Arc::new(QuicTunnelForwarder::new(
+        server.tunnels.clone(),
+        tokio::runtime::Handle::current(),
+    ));
 
     // The domain trait is sync: call it from a blocking thread like the HTTP layer does.
     let result = tokio::task::spawn_blocking(move || forwarder.forward(&session, b"frame"))

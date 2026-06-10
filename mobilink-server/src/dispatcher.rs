@@ -17,9 +17,12 @@ impl RequestDispatcher {
 
 impl RequestPipeline for RequestDispatcher {
     fn handle(&self, path: &str, request: &[u8]) -> Result<Vec<u8>, PipelineError> {
-        let session = self.router.resolve_session(path)
+        let session = self
+            .router
+            .resolve_session(path)
             .ok_or(PipelineError::SessionNotFound)?;
-        self.forwarder.forward(&session, request)
+        self.forwarder
+            .forward(&session, request)
             .map_err(PipelineError::ForwardFailed)
     }
 }

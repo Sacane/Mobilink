@@ -18,7 +18,8 @@ impl SessionHandshakeHandler {
 
 impl TunnelHandshakeHandler for SessionHandshakeHandler {
     fn handle_hello(&self, local_port: u16) -> Result<ServerMessage, HandshakeError> {
-        let session = self.registry
+        let session = self
+            .registry
             .open_session(local_port)
             .ok_or(HandshakeError::SessionCreationFailed)?;
 

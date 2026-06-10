@@ -17,7 +17,9 @@ use mobilink_core::message::{ClientMessage, ServerMessage};
 use mobilink_core::session::SessionId;
 use mobilink_core::wire;
 
-use crate::{ForwardError, RequestForwarder, SessionOptions, SessionRegistry, TunnelHandshakeHandler};
+use crate::{
+    ForwardError, RequestForwarder, SessionOptions, SessionRegistry, TunnelHandshakeHandler,
+};
 
 /// Maximum size of a single tunnel frame (32 MiB), matching the HTTP layer.
 pub const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
@@ -41,7 +43,13 @@ impl TunnelMap {
 
     fn insert(&self, id: SessionId, connection: quinn::Connection, no_eruda: bool) {
         let mut inner = self.inner.lock().expect("tunnel map lock");
-        inner.insert(id, TunnelEntry { connection, no_eruda });
+        inner.insert(
+            id,
+            TunnelEntry {
+                connection,
+                no_eruda,
+            },
+        );
     }
 
     fn remove(&self, id: &SessionId) {
@@ -97,7 +105,8 @@ impl RequestForwarder for QuicTunnelForwarder {
             send.write_all(&request)
                 .await
                 .map_err(|_| ForwardError::TunnelDisconnected)?;
-            send.finish().map_err(|_| ForwardError::TunnelDisconnected)?;
+            send.finish()
+                .map_err(|_| ForwardError::TunnelDisconnected)?;
             recv.read_to_end(MAX_FRAME_BYTES)
                 .await
                 .map_err(|_| ForwardError::TunnelDisconnected)
@@ -149,12 +158,18 @@ async fn handle_connection(
     // The CLI opens the first bidirectional stream and sends Hello.
     let (mut send, mut recv) = connection.accept_bi().await?;
     let hello_bytes = recv.read_to_end(MAX_FRAME_BYTES).await?;
-    let ClientMessage::Hello { local_port, no_eruda } = wire::decode(&hello_bytes)?;
+    let ClientMessage::Hello {
+        local_port,
+        no_eruda,
+    } = wire::decode(&hello_bytes)?;
 
     let response = handshake
         .handle_hello(local_port)
         .map_err(|e| format!("handshake refused: {e:?}"))?;
-    let ServerMessage::SessionCreated { session_id, public_url } = &response;
+    let ServerMessage::SessionCreated {
+        session_id,
+        public_url,
+    } = &response;
     let session_id = session_id.clone();
 
     tunnels.insert(session_id.clone(), connection.clone(), no_eruda);
