@@ -5,3 +5,14 @@ edition = "2024"
 
 [dependencies]
 mobilink-core = { path = "../mobilink-core" }
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+quinn = "0.11"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rcgen = "0.13"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

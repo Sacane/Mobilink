@@ -1,9 +1,12 @@
 /// Configuration for the server, loaded from environment variables or a config file.
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
+    /// UDP address the QUIC tunnel endpoint listens on.
     pub quic_bind: String,
+    /// TCP address the public HTTP endpoint listens on.
     pub http_bind: String,
-    pub domain: String,
+    /// Base of every public URL, scheme included (e.g. "https://my-vps.com").
+    pub public_url: String,
 }
 
 impl Default for ServerConfig {
@@ -11,7 +14,7 @@ impl Default for ServerConfig {
         Self {
             quic_bind: "0.0.0.0:4433".to_string(),
             http_bind: "0.0.0.0:8080".to_string(),
-            domain: "localhost".to_string(),
+            public_url: "http://localhost:8080".to_string(),
         }
     }
 }

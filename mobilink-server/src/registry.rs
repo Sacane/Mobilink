@@ -9,14 +9,15 @@ use crate::{SessionError, SessionRegistry};
 /// Holds all active sessions in a thread-safe map.
 pub struct InMemorySessionRegistry {
     sessions: Mutex<HashMap<SessionId, Session>>,
-    domain: String,
+    /// Base of every public URL, scheme included (e.g. "https://my-vps.com").
+    public_base_url: String,
 }
 
 impl InMemorySessionRegistry {
-    pub fn new(domain: impl Into<String>) -> Self {
+    pub fn new(public_base_url: impl Into<String>) -> Self {
         Self {
             sessions: Mutex::new(HashMap::new()),
-            domain: domain.into(),
+            public_base_url: public_base_url.into().trim_end_matches('/').to_string(),
         }
     }
 }
@@ -25,7 +26,7 @@ impl SessionRegistry for InMemorySessionRegistry {
     fn open_session(&self, port: u16) -> Option<Session> {
         let session = Session::new(port, String::new());
         let session = Session {
-            public_url: format!("https://{}/s/{}", self.domain, session.id),
+            public_url: format!("{}/s/{}", self.public_base_url, session.id),
             ..session
         };
         self.register_session(session).ok()

@@ -1,8 +1,9 @@
 use mobilink_core::session::{Session, SessionId};
 
 pub mod dispatcher;
-pub mod forwarder;
 pub mod handshake;
+pub mod http;
+pub mod quic;
 pub mod registry;
 pub mod router;
 pub mod transform;
@@ -37,6 +38,12 @@ pub trait HttpRouter: Send + Sync {
     /// Given a URL path (e.g. "/s/abc123"), returns the matching active session.
     /// Returns None if the path doesn't match or the session doesn't exist.
     fn resolve_session(&self, path: &str) -> Option<Session>;
+}
+
+/// Per-session options negotiated during the tunnel handshake.
+pub trait SessionOptions: Send + Sync {
+    /// True when the developer started the CLI with `--no-eruda`.
+    fn eruda_disabled(&self, id: &SessionId) -> bool;
 }
 
 /// Transforms an HTTP response on its way back to the mobile browser.
