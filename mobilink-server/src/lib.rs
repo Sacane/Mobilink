@@ -5,6 +5,7 @@ pub mod forwarder;
 pub mod handshake;
 pub mod registry;
 pub mod router;
+pub mod transform;
 
 /// Reason why a session operation failed.
 #[derive(Debug, PartialEq)]
@@ -36,6 +37,15 @@ pub trait HttpRouter: Send + Sync {
     /// Given a URL path (e.g. "/s/abc123"), returns the matching active session.
     /// Returns None if the path doesn't match or the session doesn't exist.
     fn resolve_session(&self, path: &str) -> Option<Session>;
+}
+
+/// Transforms an HTTP response on its way back to the mobile browser.
+/// This is where the proxy gets "HTTP-aware": injecting debug tooling,
+/// rewriting headers, etc.
+pub trait ResponseTransformer: Send + Sync {
+    /// Returns the (possibly modified) response to send to the mobile browser.
+    fn transform(&self, response: mobilink_core::http::HttpResponseData)
+        -> mobilink_core::http::HttpResponseData;
 }
 
 /// Processes the QUIC handshake when a CLI connects.
