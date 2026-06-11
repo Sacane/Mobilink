@@ -2,12 +2,47 @@
 //!
 //! Gherkin: cli_starting_a_tunnel.md + terminal_developer_experience.md.
 
+use std::net::SocketAddr;
 use std::process::ExitCode;
 
 use clap::Parser;
 
 use mobilink_cli::args::{Cli, Command, StartArgs};
 use mobilink_cli::{tls, tunnel, ui};
+
+/// Picks the first IPv4 address from a resolved list, falling back to the
+/// first address of any family when no IPv4 is present.
+///
+/// Windows resolves `localhost` to `[::1]` before `127.0.0.1`; quinn's
+/// client endpoint is bound to `0.0.0.0` (IPv4), so connecting to an IPv6
+/// address fails immediately. Preferring IPv4 fixes the local dev workflow
+/// without affecting production use (VPS hostnames resolve to IPv4 anyway).
+fn prefer_ipv4(addrs: &[SocketAddr]) -> Option<SocketAddr> {
+    addrs.iter().find(|a| a.is_ipv4()).or_else(|| addrs.first()).copied()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolver_prefers_ipv4_when_both_families_are_present() {
+        let addrs: Vec<SocketAddr> =
+            vec!["[::1]:4433".parse().unwrap(), "127.0.0.1:4433".parse().unwrap()];
+        assert_eq!(prefer_ipv4(&addrs), Some("127.0.0.1:4433".parse().unwrap()));
+    }
+
+    #[test]
+    fn resolver_falls_back_to_ipv6_when_no_ipv4_is_available() {
+        let addrs: Vec<SocketAddr> = vec!["[::1]:4433".parse().unwrap()];
+        assert_eq!(prefer_ipv4(&addrs), Some("[::1]:4433".parse().unwrap()));
+    }
+
+    #[test]
+    fn resolver_returns_none_for_an_empty_list() {
+        assert_eq!(prefer_ipv4(&[]), None);
+    }
+}
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -24,10 +59,10 @@ async fn main() -> ExitCode {
 }
 
 async fn run(args: StartArgs) -> Result<(), Box<dyn std::error::Error>> {
-    // Resolve the server address (DNS or literal IP).
-    let server_addr = tokio::net::lookup_host((args.server.as_str(), args.server_port))
-        .await?
-        .next()
+    // Resolve the server address (DNS or literal IP), preferring IPv4.
+    let addrs: Vec<SocketAddr> =
+        tokio::net::lookup_host((args.server.as_str(), args.server_port)).await?.collect();
+    let server_addr = prefer_ipv4(&addrs)
         .ok_or_else(|| format!("could not resolve host '{}'", args.server))?;
 
     let endpoint = tls::insecure_client_endpoint()?;
