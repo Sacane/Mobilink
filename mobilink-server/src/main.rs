@@ -3,8 +3,8 @@
 //!
 //! Configuration via environment variables:
 //! - `MOBILINK_QUIC_BIND`  (default 0.0.0.0:4433) — UDP, tunnel side
-//! - `MOBILINK_HTTP_BIND`  (default 0.0.0.0:8080) — TCP, public side
-//! - `MOBILINK_PUBLIC_URL` (default http://localhost:8080) — base of public URLs
+//! - `MOBILINK_HTTP_BIND`  (default 0.0.0.0:8060) — TCP, public side
+//! - `MOBILINK_PUBLIC_URL` (default http://localhost:8060) — base of public URLs
 
 use std::sync::Arc;
 

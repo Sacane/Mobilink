@@ -82,7 +82,7 @@ cargo build --release
 ### 2. Start the server on your VPS
 
 ```bash
-MOBILINK_PUBLIC_URL=http://my-vps.com:8080 ./mobilink-server
+MOBILINK_PUBLIC_URL=http://my-vps.com:8060 ./mobilink-server
 ```
 
 ### 3. Start a tunnel from your machine

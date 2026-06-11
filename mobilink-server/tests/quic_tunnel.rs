@@ -29,7 +29,7 @@ struct Harness {
 
 /// Starts a real tunnel endpoint on a random localhost port.
 fn start_server() -> Harness {
-    let registry = Arc::new(InMemorySessionRegistry::new("http://127.0.0.1:8080"));
+    let registry = Arc::new(InMemorySessionRegistry::new("http://127.0.0.1:8060"));
     let tunnels = Arc::new(TunnelMap::new());
     let handler = Arc::new(SessionHandshakeHandler::new(registry.clone()));
 

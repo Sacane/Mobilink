@@ -13,8 +13,8 @@ impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             quic_bind: "0.0.0.0:4433".to_string(),
-            http_bind: "0.0.0.0:8080".to_string(),
-            public_url: "http://localhost:8080".to_string(),
+            http_bind: "0.0.0.0:8060".to_string(),
+            public_url: "http://localhost:8060".to_string(),
         }
     }
 }

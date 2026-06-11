@@ -268,7 +268,7 @@ mod tests {
         let existing = registry.open_session(3000).expect("Expected a session");
         let duplicate = Session {
             id: existing.id.clone(),
-            local_port: 8080,
+            local_port: 8060,
             public_url: "http://localhost/s/duplicate".to_string(),
         };
         let result = registry.register_session(duplicate);

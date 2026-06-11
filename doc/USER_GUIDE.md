@@ -16,7 +16,7 @@ localhost:3000          https://my-vps.com/s/abc123
 
 - A server you control (VPS, home server…) with a public IP or DNS name.
 - One **UDP** port open for the QUIC tunnel (default **4433**).
-- One **TCP** port open for the public HTTP endpoint (default **8080**).
+- One **TCP** port open for the public HTTP endpoint (default **8060**).
 - The two release binaries: `mobilink-server` (server) and `mobilink` (CLI).
 
 Build them from source with:
@@ -31,7 +31,7 @@ cargo build --release
 ## 2. Start the server (once, on your VPS)
 
 ```bash
-MOBILINK_PUBLIC_URL=http://my-vps.com:8080 ./mobilink-server
+MOBILINK_PUBLIC_URL=http://my-vps.com:8060 ./mobilink-server
 ```
 
 Configuration is done entirely through environment variables:
@@ -39,8 +39,8 @@ Configuration is done entirely through environment variables:
 | Variable | Default | Meaning |
 |---|---|---|
 | `MOBILINK_QUIC_BIND` | `0.0.0.0:4433` | UDP address the tunnel listens on |
-| `MOBILINK_HTTP_BIND` | `0.0.0.0:8080` | TCP address the public endpoint listens on |
-| `MOBILINK_PUBLIC_URL` | `http://localhost:8080` | Base of the URLs given to developers |
+| `MOBILINK_HTTP_BIND` | `0.0.0.0:8060` | TCP address the public endpoint listens on |
+| `MOBILINK_PUBLIC_URL` | `http://localhost:8060` | Base of the URLs given to developers |
 
 `MOBILINK_PUBLIC_URL` is what your phone will use — set it to whatever your
 server is reachable as from the outside (scheme included).
@@ -70,7 +70,7 @@ The terminal then shows:
   path, status code and latency:
 
 ```
-  Tunnel ready!  localhost:3000  ⇒  http://my-vps.com:8080/s/9ac2b837…
+  Tunnel ready!  localhost:3000  ⇒  http://my-vps.com:8060/s/9ac2b837…
 
   █▀▀▀▀▀█ ▀▄█▀▄▀▄ █▀▀▀▀▀█
   …
