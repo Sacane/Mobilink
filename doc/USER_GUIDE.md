@@ -99,11 +99,72 @@ beyond your server.
 
 ---
 
-## 5. What you should know (MVP limitations)
+## 5. Single-page apps (SPA): enable hash routing
+
+Mobilink serves your app under a path prefix — `https://my-vps.com:8060/s/{id}/`.
+A client-side router in **history mode** reads `window.location.pathname`,
+sees `/s/{id}/...` instead of `/`, matches none of its routes, and you get a
+blank page or a client-side 404 on every route except the entry point.
+
+The fix is **hash routing**: the route lives in the URL fragment
+(`/s/{id}/#/booklet`). The fragment stays in the browser and is never sent
+through the tunnel, so the prefix no longer interferes with routing.
+
+**Do not hard-code hash mode** — you don't want `#/` URLs in production.
+Gate it behind an environment variable that you only set when running through
+Mobilink, so production keeps clean history-mode URLs.
+
+**Nuxt** (`nuxt.config.ts`):
+
+```ts
+export default defineNuxtConfig({
+  router: {
+    options: {
+      hashMode: !!process.env.MOBILINK,
+    },
+  },
+})
+```
+
+```bash
+# expose through Mobilink → hash mode on
+MOBILINK=1 npm run dev
+# everything else → history mode (unchanged)
+npm run dev
+```
+
+**Vue Router** (standalone):
+
+```ts
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
+
+const history = import.meta.env.VITE_MOBILINK
+  ? createWebHashHistory()
+  : createWebHistory()
+
+const router = createRouter({ history, routes })
+```
+
+**React Router**: use `<HashRouter>` instead of `<BrowserRouter>` when the same
+env flag is set.
+
+Then start your tunnel as usual:
+
+```bash
+./mobilink start --port 3000 --server my-vps.com
+```
+
+> Server-rendered apps and sites using **relative** asset paths don't need
+> this — only client-side routers in history mode are affected.
+
+---
+
+## 6. What you should know (MVP limitations)
 
 - **Sessions are URL-path based** (`/s/{id}/…`). Pages using absolute paths
   (`/css/app.css`) will resolve them against the server root and break.
-  Apps using relative paths work fine. Subdomain routing is on the roadmap.
+  Apps using relative paths work fine. Single-page apps need hash routing —
+  see section 5. Subdomain routing is on the roadmap.
 - **TLS between CLI and server**: the tunnel is encrypted, but the server's
   certificate is self-signed and not verified by the CLI (MVP). Certificate
   pinning is planned.
@@ -116,7 +177,7 @@ beyond your server.
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
@@ -124,3 +185,4 @@ beyond your server.
 | Public URL returns **404** | The session is gone — the CLI was stopped or the server restarted |
 | Public URL returns **502** | The tunnel is up but nothing answers on your local port |
 | Page loads but looks broken | Absolute asset paths — see limitations above |
+| Entry page works, **other routes 404** | SPA in history mode — enable hash routing (section 5) |
