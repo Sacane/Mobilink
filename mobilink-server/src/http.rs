@@ -11,7 +11,8 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{Request, Response, StatusCode};
+use axum::http::{Method, Request, Response, StatusCode};
+use axum::middleware::{self, Next};
 
 use mobilink_core::http::{HttpRequestData, HttpResponseData};
 use mobilink_core::wire;
@@ -46,8 +47,45 @@ pub struct ProxyState {
 
 /// Builds the public-facing router. Every path goes through the proxy
 /// handler; anything that doesn't look like `/s/{id}...` is a 404.
+/// A CORS middleware wraps all responses so browser fetch/XHR from any
+/// origin can reach the developer's local server without being blocked.
 pub fn public_router(state: ProxyState) -> Router {
-    Router::new().fallback(proxy_handler).with_state(state)
+    Router::new()
+        .fallback(proxy_handler)
+        .with_state(state)
+        .layer(middleware::from_fn(cors_layer))
+}
+
+async fn cors_layer(request: Request<Body>, next: Next) -> Response<Body> {
+    if request.method() == Method::OPTIONS {
+        return cors_preflight_response();
+    }
+    let mut response = next.run(request).await;
+    add_cors_headers(response.headers_mut());
+    response
+}
+
+fn add_cors_headers(headers: &mut axum::http::HeaderMap) {
+    headers.insert("access-control-allow-origin", "*".parse().unwrap());
+    headers.insert(
+        "access-control-allow-methods",
+        "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+            .parse()
+            .unwrap(),
+    );
+    headers.insert("access-control-allow-headers", "*".parse().unwrap());
+}
+
+fn cors_preflight_response() -> Response<Body> {
+    let mut response = Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .body(Body::empty())
+        .expect("preflight response must build");
+    add_cors_headers(response.headers_mut());
+    response
+        .headers_mut()
+        .insert("access-control-max-age", "86400".parse().unwrap());
+    response
 }
 
 async fn proxy_handler(State(state): State<ProxyState>, request: Request<Body>) -> Response<Body> {
@@ -330,5 +368,74 @@ mod tests {
             !body.contains("eruda"),
             "--no-eruda must keep the HTML untouched"
         );
+    }
+
+    // --- Scenario: CORS ---
+
+    #[tokio::test]
+    async fn cors_headers_are_present_on_successful_proxy_response() {
+        let pipeline = SpyPipeline::new(StubOutcome::Respond(html_page()));
+        let (_, uri) = session_uri("");
+
+        let response = app(Arc::clone(&pipeline), false)
+            .oneshot(Request::builder().uri(&uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .unwrap(),
+            "*"
+        );
+    }
+
+    #[tokio::test]
+    async fn cors_headers_are_present_on_error_responses() {
+        let pipeline = SpyPipeline::new(StubOutcome::SessionMissing);
+        let (_, uri) = session_uri("");
+
+        let response = app(pipeline, false)
+            .oneshot(Request::builder().uri(&uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .unwrap(),
+            "*"
+        );
+    }
+
+    #[tokio::test]
+    async fn options_preflight_returns_no_content_with_cors_headers() {
+        let pipeline = SpyPipeline::new(StubOutcome::SessionMissing);
+        let (_, uri) = session_uri("/api/data");
+
+        let response = app(pipeline, false)
+            .oneshot(
+                Request::builder()
+                    .method("OPTIONS")
+                    .uri(&uri)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .unwrap(),
+            "*"
+        );
+        assert!(response.headers().get("access-control-max-age").is_some());
     }
 }

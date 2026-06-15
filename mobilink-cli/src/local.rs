@@ -35,7 +35,7 @@ async fn try_replay(
     port: u16,
     request: HttpRequestData,
 ) -> Result<HttpResponseData, Box<dyn std::error::Error + Send + Sync>> {
-    let url = format!("http://127.0.0.1:{port}{}", request.target);
+    let url = format!("http://localhost:{port}{}", request.target);
     let method = reqwest::Method::from_bytes(request.method.as_bytes())?;
 
     let mut builder = client.request(method, url);

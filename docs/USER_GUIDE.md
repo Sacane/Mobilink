@@ -99,13 +99,127 @@ beyond your server.
 
 ---
 
-## 5. What you should know (MVP limitations)
+## 5. Single-page apps (SPA): enable hash routing
+
+Mobilink serves your app under a path prefix — `https://my-vps.com:8060/s/{id}/`.
+A client-side router in **history mode** reads `window.location.pathname`,
+sees `/s/{id}/...` instead of `/`, matches none of its routes, and you get a
+blank page or a client-side 404 on every route except the entry point.
+
+The fix is **hash routing**: the route lives in the URL fragment
+(`/s/{id}/#/booklet`). The fragment stays in the browser and is never sent
+through the tunnel, so the prefix no longer interferes with routing.
+
+**Do not hard-code hash mode** — you don't want `#/` URLs in production.
+Gate it behind an environment variable that you only set when running through
+Mobilink, so production keeps clean history-mode URLs.
+
+### Nuxt (`nuxt.config.ts`)
+
+```ts
+export default defineNuxtConfig({
+  router: {
+    options: {
+      hashMode: !!process.env.MOBILINK,
+    },
+  },
+})
+```
+
+```bash
+# expose through Mobilink → hash mode on
+MOBILINK=1 npm run dev
+# everything else → history mode (unchanged)
+npm run dev
+```
+
+### Vue (Vue Router 4)
+
+```ts
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
+
+const history = import.meta.env.VITE_MOBILINK
+  ? createWebHashHistory()
+  : createWebHistory()
+
+const router = createRouter({ history, routes })
+```
+
+### React (React Router v6.4+)
+
+```jsx
+// main.jsx — pick the router factory from the same env flag
+import {
+  createHashRouter,
+  createBrowserRouter,
+  RouterProvider,
+} from 'react-router-dom'
+
+const makeRouter = import.meta.env.VITE_MOBILINK
+  ? createHashRouter
+  : createBrowserRouter
+
+createRoot(document.getElementById('root')).render(
+  <RouterProvider router={makeRouter(routes)} />,
+)
+
+// Component API: swap <BrowserRouter> for <HashRouter> under the same flag.
+```
+
+### Angular (Angular Router)
+
+```ts
+// app.config.ts — standalone bootstrap (Angular 17+)
+import { provideRouter, withHashLocation } from '@angular/router'
+import { environment } from './environments/environment'
+
+export const appConfig = {
+  providers: [
+    provideRouter(routes, ...(environment.mobilink ? [withHashLocation()] : [])),
+  ],
+}
+
+// NgModule style: RouterModule.forRoot(routes, { useHash: true })
+```
+
+Add a `mobilink` flag to a dedicated `environment.mobilink.ts` and serve it with
+`ng serve --configuration mobilink`.
+
+### Svelte (SvelteKit 2.17+)
+
+```js
+// svelte.config.js
+export default {
+  kit: {
+    router: { type: process.env.MOBILINK ? 'hash' : 'pathname' },
+  },
+}
+```
+
+For a plain Vite + Svelte SPA (no SvelteKit), use a hash-based router such as
+[`svelte-spa-router`](https://github.com/ItalyPaleAle/svelte-spa-router), which
+routes on the hash by default.
+
+Then start your tunnel as usual:
+
+```bash
+./mobilink start --port 3000 --server my-vps.com
+```
+
+> Server-rendered apps and sites using **relative** asset paths don't need
+> this — only client-side routers in history mode are affected. Hash routing
+> fixes navigation, not assets: if your pages load assets with absolute paths
+> (`/assets/app.js`), also set a relative base — e.g. Vite `base: './'`,
+> Angular `<base href="./">`.
+
+---
+
+## 6. What you should know (MVP limitations)
 
 - **Sessions are URL-path based** (`/s/{id}/…`). Pages using absolute paths
   (`/css/app.css`) will resolve them against the server root and break.
-  Apps using relative paths work fine. Subdomain routing is on the roadmap.
-  For single-page apps, switch your router to **hash mode** — see
-  [§6 Single-page app routing](#6-single-page-app-routing-hash-mode).
+  Apps using relative paths work fine. Single-page apps need hash routing —
+  see section 5. Subdomain routing is on the roadmap.
 - **TLS between CLI and server**: the tunnel is encrypted, but the server's
   certificate is self-signed and not verified by the CLI (MVP). Certificate
   pinning is planned.
@@ -118,84 +232,6 @@ beyond your server.
 
 ---
 
-## 6. Single-page app routing (hash mode)
-
-Because sessions live under a path prefix (`/s/{id}/…`, see the limitation
-above), SPA routers that use the HTML5 **history** API produce absolute URLs
-(`/dashboard`, `/users/42`). Those resolve against the server root, escape your
-session and 404 on the next navigation.
-
-The fix is **hash routing**: routes live in the URL fragment
-(`…/s/{id}/#/dashboard`), which the browser never sends to the server, so they
-keep working behind any prefix. Switch your dev build to hash mode while you
-test through Mobilink.
-
-### React (React Router v6.4+)
-
-```jsx
-// main.jsx — swap createBrowserRouter for createHashRouter
-import { createHashRouter, RouterProvider } from "react-router-dom";
-
-const router = createHashRouter(routes);
-
-createRoot(document.getElementById("root")).render(
-  <RouterProvider router={router} />,
-);
-
-// Older component API: use <HashRouter> instead of <BrowserRouter>
-//   import { HashRouter } from "react-router-dom";
-//   <HashRouter><App /></HashRouter>
-```
-
-### Vue (Vue Router 4)
-
-```js
-// router/index.js — swap createWebHistory for createWebHashHistory
-import { createRouter, createWebHashHistory } from "vue-router";
-
-const router = createRouter({
-  history: createWebHashHistory(),
-  routes,
-});
-
-export default router;
-```
-
-### Angular (Angular Router)
-
-```ts
-// app.config.ts — standalone bootstrap (Angular 17+)
-import { provideRouter, withHashLocation } from "@angular/router";
-
-export const appConfig = {
-  providers: [provideRouter(routes, withHashLocation())],
-};
-
-// NgModule style:
-//   RouterModule.forRoot(routes, { useHash: true })
-```
-
-### Svelte (SvelteKit 2.17+)
-
-```js
-// svelte.config.js
-export default {
-  kit: {
-    router: { type: "hash" },
-  },
-};
-```
-
-For a plain Vite + Svelte SPA (no SvelteKit), use a hash-based router such as
-[`svelte-spa-router`](https://github.com/ItalyPaleAle/svelte-spa-router), which
-routes on the hash by default.
-
-> **Hash routing fixes navigation, not assets.** If your pages also load assets
-> with absolute paths (`/assets/app.js`), set your dev server's base to a
-> relative path too — e.g. Vite `base: "./"`, Angular `<base href="./">`.
-
----
-
 ## 7. Troubleshooting
 
 | Symptom | Likely cause |
@@ -204,3 +240,4 @@ routes on the hash by default.
 | Public URL returns **404** | The session is gone — the CLI was stopped or the server restarted |
 | Public URL returns **502** | The tunnel is up but nothing answers on your local port |
 | Page loads but looks broken | Absolute asset paths — see limitations above |
+| Entry page works, **other routes 404** | SPA in history mode — enable hash routing (section 5) |
