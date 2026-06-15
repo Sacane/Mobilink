@@ -7,7 +7,11 @@
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[command(name = "mobilink", version, about = "Expose a local port through your own Mobilink server")]
+#[command(
+    name = "mobilink",
+    version,
+    about = "Expose a local port through your own Mobilink server"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -49,8 +53,15 @@ mod tests {
 
     #[test]
     fn start_with_port_and_server_is_accepted() {
-        let cli = parse(&["mobilink", "start", "--port", "3000", "--server", "my-vps.com"])
-            .expect("valid arguments must parse");
+        let cli = parse(&[
+            "mobilink",
+            "start",
+            "--port",
+            "3000",
+            "--server",
+            "my-vps.com",
+        ])
+        .expect("valid arguments must parse");
         let Command::Start(args) = cli.command;
         assert_eq!(args.port, 3000);
         assert_eq!(args.server, "my-vps.com");
@@ -61,7 +72,13 @@ mod tests {
     #[test]
     fn no_eruda_flag_is_recorded() {
         let cli = parse(&[
-            "mobilink", "start", "--port", "3000", "--server", "my-vps.com", "--no-eruda",
+            "mobilink",
+            "start",
+            "--port",
+            "3000",
+            "--server",
+            "my-vps.com",
+            "--no-eruda",
         ])
         .expect("valid arguments must parse");
         let Command::Start(args) = cli.command;

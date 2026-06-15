@@ -7,7 +7,7 @@ third-party cloud: one binary on your VPS, one binary on your laptop.
 ```
 your laptop                 your VPS                    your phone
 mobilink  <== QUIC ==>  mobilink-server  <== HTTP ==>  browser
-localhost:3000          https://my-vps.com/s/abc123
+localhost:3000          https://my-vps.com
 ```
 
 ---
@@ -43,9 +43,10 @@ Configuration is done entirely through environment variables:
 | `MOBILINK_PUBLIC_URL` | `http://localhost:8060` | Base of the URLs given to developers |
 
 `MOBILINK_PUBLIC_URL` is what your phone will use — set it to whatever your
-server is reachable as from the outside (scheme included).
+server is reachable as from the outside (scheme included), with no path.
 
-The server keeps running and serves any number of simultaneous sessions.
+The server keeps running; the most recently connected tunnel owns the public
+host (see the one-active-tunnel note in section 6).
 
 ---
 
@@ -70,7 +71,7 @@ The terminal then shows:
   path, status code and latency:
 
 ```
-  Tunnel ready!  localhost:3000  ⇒  http://my-vps.com:8060/s/9ac2b837…
+  Tunnel ready!  localhost:3000  ⇒  http://my-vps.com:8060
 
   █▀▀▀▀▀█ ▀▄█▀▄▀▄ █▀▀▀▀▀█
   …
@@ -99,135 +100,40 @@ beyond your server.
 
 ---
 
-## 5. Single-page apps (SPA): enable hash routing
+## 5. Single-page apps (SPA) and dev servers
 
-Mobilink serves your app under a path prefix — `https://my-vps.com:8060/s/{id}/`.
-A client-side router in **history mode** reads `window.location.pathname`,
-sees `/s/{id}/...` instead of `/`, matches none of its routes, and you get a
-blank page or a client-side 404 on every route except the entry point.
+Mobilink dedicates the whole public host to your active tunnel
+(`https://my-vps.com/`) and forwards **every** request path verbatim to your
+local server. A client-side router in **history mode** (`/dashboard`) and
+absolute asset paths (`/_nuxt/...`, `/assets/app.js`) all resolve correctly
+through the tunnel.
 
-The fix is **hash routing**: the route lives in the URL fragment
-(`/s/{id}/#/booklet`). The fragment stays in the browser and is never sent
-through the tunnel, so the prefix no longer interferes with routing.
+**SPAs in history mode and framework dev servers (Vite, Nuxt, Next, …) work
+out of the box — no hash routing, no relative-base config needed.**
 
-**Do not hard-code hash mode** — you don't want `#/` URLs in production.
-Gate it behind an environment variable that you only set when running through
-Mobilink, so production keeps clean history-mode URLs.
-
-### Nuxt (`nuxt.config.ts`)
-
-```ts
-export default defineNuxtConfig({
-  router: {
-    options: {
-      hashMode: !!process.env.MOBILINK,
-    },
-  },
-})
-```
-
-```bash
-# expose through Mobilink → hash mode on
-MOBILINK=1 npm run dev
-# everything else → history mode (unchanged)
-npm run dev
-```
-
-### Vue (Vue Router 4)
-
-```ts
-import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
-
-const history = import.meta.env.VITE_MOBILINK
-  ? createWebHashHistory()
-  : createWebHistory()
-
-const router = createRouter({ history, routes })
-```
-
-### React (React Router v6.4+)
-
-```jsx
-// main.jsx — pick the router factory from the same env flag
-import {
-  createHashRouter,
-  createBrowserRouter,
-  RouterProvider,
-} from 'react-router-dom'
-
-const makeRouter = import.meta.env.VITE_MOBILINK
-  ? createHashRouter
-  : createBrowserRouter
-
-createRoot(document.getElementById('root')).render(
-  <RouterProvider router={makeRouter(routes)} />,
-)
-
-// Component API: swap <BrowserRouter> for <HashRouter> under the same flag.
-```
-
-### Angular (Angular Router)
-
-```ts
-// app.config.ts — standalone bootstrap (Angular 17+)
-import { provideRouter, withHashLocation } from '@angular/router'
-import { environment } from './environments/environment'
-
-export const appConfig = {
-  providers: [
-    provideRouter(routes, ...(environment.mobilink ? [withHashLocation()] : [])),
-  ],
-}
-
-// NgModule style: RouterModule.forRoot(routes, { useHash: true })
-```
-
-Add a `mobilink` flag to a dedicated `environment.mobilink.ts` and serve it with
-`ng serve --configuration mobilink`.
-
-### Svelte (SvelteKit 2.17+)
-
-```js
-// svelte.config.js
-export default {
-  kit: {
-    router: { type: process.env.MOBILINK ? 'hash' : 'pathname' },
-  },
-}
-```
-
-For a plain Vite + Svelte SPA (no SvelteKit), use a hash-based router such as
-[`svelte-spa-router`](https://github.com/ItalyPaleAle/svelte-spa-router), which
-routes on the hash by default.
-
-Then start your tunnel as usual:
-
-```bash
-./mobilink start --port 3000 --server my-vps.com
-```
-
-> Server-rendered apps and sites using **relative** asset paths don't need
-> this — only client-side routers in history mode are affected. Hash routing
-> fixes navigation, not assets: if your pages load assets with absolute paths
-> (`/assets/app.js`), also set a relative base — e.g. Vite `base: './'`,
-> Angular `<base href="./">`.
+> The one thing that does **not** travel through the tunnel yet is the dev
+> server's hot-reload **WebSocket** (Vite/Nuxt HMR). Your page loads and runs,
+> but live reload is disabled — refresh manually after a change. WebSocket
+> tunneling is on the roadmap.
 
 ---
 
 ## 6. What you should know (MVP limitations)
 
-- **Sessions are URL-path based** (`/s/{id}/…`). Pages using absolute paths
-  (`/css/app.css`) will resolve them against the server root and break.
-  Apps using relative paths work fine. Single-page apps need hash routing —
-  see section 5. Subdomain routing is on the roadmap.
+- **One active tunnel per server.** The public host is dedicated to the most
+  recently connected tunnel (whole-host routing), so one server proxies one
+  developer at a time. Per-session subdomain routing is on the roadmap.
+- **Hot reload (HMR) is not tunneled yet.** Dev-server WebSockets don't pass
+  through, so live reload is disabled — the page loads, but you refresh
+  manually. Plain WebSocket tunneling is on the roadmap.
 - **TLS between CLI and server**: the tunnel is encrypted, but the server's
   certificate is self-signed and not verified by the CLI (MVP). Certificate
   pinning is planned.
 - **Public HTTPS** is not terminated by Mobilink itself; put a reverse
   proxy (Caddy, nginx) in front of the HTTP endpoint if you need
   `https://` for your phone.
-- **Sessions live in memory**: restarting the server forgets all sessions
-  (the CLIs notice and exit; just restart them).
+- **Sessions live in memory**: restarting the server forgets the session
+  (the CLI notices and exits; just restart it).
 - Request and response bodies are capped at **32 MiB**.
 
 ---
@@ -237,7 +143,6 @@ Then start your tunnel as usual:
 | Symptom | Likely cause |
 |---|---|
 | `could not reach the Mobilink server` | Wrong host/port, or UDP 4433 blocked by a firewall |
-| Public URL returns **404** | The session is gone — the CLI was stopped or the server restarted |
+| Public URL returns **404** | No tunnel is connected — the CLI was stopped or the server restarted |
 | Public URL returns **502** | The tunnel is up but nothing answers on your local port |
-| Page loads but looks broken | Absolute asset paths — see limitations above |
-| Entry page works, **other routes 404** | SPA in history mode — enable hash routing (section 5) |
+| Page loads but **no live reload** | HMR WebSocket isn't tunneled yet — refresh manually (section 5) |

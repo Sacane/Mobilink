@@ -33,14 +33,24 @@ pub async fn connect_and_handshake(
     let connection = endpoint.connect(server_addr, server_name)?.await?;
 
     let (mut send, mut recv) = connection.open_bi().await?;
-    let hello = ClientMessage::Hello { local_port, no_eruda };
+    let hello = ClientMessage::Hello {
+        local_port,
+        no_eruda,
+    };
     send.write_all(&wire::encode(&hello)?).await?;
     send.finish()?;
 
     let bytes = recv.read_to_end(MAX_FRAME_BYTES).await?;
-    let ServerMessage::SessionCreated { session_id, public_url } = wire::decode(&bytes)?;
+    let ServerMessage::SessionCreated {
+        session_id,
+        public_url,
+    } = wire::decode(&bytes)?;
 
-    Ok(TunnelSession { session_id, public_url, connection })
+    Ok(TunnelSession {
+        session_id,
+        public_url,
+        connection,
+    })
 }
 
 /// Serve loop: accepts request streams until the connection closes.

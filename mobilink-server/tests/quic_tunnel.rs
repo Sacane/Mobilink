@@ -82,12 +82,12 @@ async fn cli_handshake_creates_a_session_with_an_active_tunnel() {
     // The session exists in the registry…
     let session = server.registry.get_session(&session_id);
     assert!(session.is_some(), "handshake must create a session");
-    assert!(
-        public_url.contains(&session_id.to_string()),
-        "public URL must contain the session id"
+    assert_eq!(
+        public_url, "http://127.0.0.1:8060",
+        "whole-host routing exposes the host root as the public URL"
     );
     // …and Eruda is enabled by default.
-    assert!(!server.tunnels.eruda_disabled(&session_id));
+    assert!(!server.tunnels.eruda_disabled());
 }
 
 #[tokio::test]
@@ -95,10 +95,10 @@ async fn no_eruda_flag_is_remembered_for_the_session() {
     let server = start_server();
 
     let (connection, _client) = connect_insecure(server.server_addr).await;
-    let ServerMessage::SessionCreated { session_id, .. } = handshake(&connection, true).await;
+    let ServerMessage::SessionCreated { .. } = handshake(&connection, true).await;
 
     assert!(
-        server.tunnels.eruda_disabled(&session_id),
+        server.tunnels.eruda_disabled(),
         "--no-eruda must be remembered server-side"
     );
 }

@@ -31,7 +31,7 @@ by Gherkin scenarios in `docs/gherkins/` and locked by contract tests in
 | Trait | Production impl | Role |
 |---|---|---|
 | `SessionRegistry` | `InMemorySessionRegistry` | open / get / register / close sessions |
-| `HttpRouter` | `SessionRouter` | URL path → active session (`/s/{id}/…`) |
+| `HttpRouter` | `SessionRouter` | any request path → the active tunnel session (whole-host routing) |
 | `RequestForwarder` | `QuicTunnelForwarder` | request bytes → through the tunnel → response bytes |
 | `RequestPipeline` | `RequestDispatcher` | router + forwarder = full request lifecycle |
 | `TunnelHandshakeHandler` | `SessionHandshakeHandler` | Hello(port) → SessionCreated |
@@ -76,15 +76,15 @@ the registry. The public URL turns 404 within milliseconds.
 
 ```
 mobile browser
-   │  GET /s/{id}/api/items?page=2
+   │  GET /api/items?page=2
    ▼
 axum fallback handler (http.rs)
-   │  parse_public_path → (session_id, "/api/items")
+   │  path forwarded verbatim → target "/api/items?page=2"
    │  Request → HttpRequestData   (strip host/connection/accept-encoding/…)
    │  wire::encode
    ▼
 RequestDispatcher::handle          (spawn_blocking)
-   │  SessionRouter::resolve_session
+   │  SessionRouter::resolve_session → the active tunnel session
    ▼
 QuicTunnelForwarder::forward       (Handle::block_on)
    │  open_bi → write frame → finish → read_to_end
@@ -152,7 +152,9 @@ Run everything with `cargo test --workspace`.
 - Logs are `tracing`-structured; set `RUST_LOG=debug` for verbose output.
 - The public endpoint speaks plain HTTP; terminate TLS in front of it
   (Caddy/nginx) and set `MOBILINK_PUBLIC_URL=https://…` accordingly.
-- Known MVP limits: path-prefix routing breaks absolute asset paths
-  (subdomain routing is the planned fix), 32 MiB body cap, no
+- Known MVP limits: whole-host routing dedicates the public host to a
+  single active tunnel (the most recent one wins; per-session subdomain
+  routing is the planned multi-tunnel fix); dev-server hot-reload
+  WebSockets (Vite/Nuxt HMR) are not tunneled yet; 32 MiB body cap; no
   authentication of CLIs (anyone who can reach UDP 4433 can open a
   session — firewall accordingly).

@@ -66,7 +66,12 @@ async fn start_mobilink_server() -> Mobilink {
 
     let endpoint = make_server_endpoint("127.0.0.1:0".parse().unwrap()).unwrap();
     let quic_addr = endpoint.local_addr().unwrap();
-    tokio::spawn(run_tunnel_endpoint(endpoint, registry, handshake, tunnels.clone()));
+    tokio::spawn(run_tunnel_endpoint(
+        endpoint,
+        registry,
+        handshake,
+        tunnels.clone(),
+    ));
 
     let app = public_router(ProxyState {
         pipeline,
@@ -75,16 +80,24 @@ async fn start_mobilink_server() -> Mobilink {
     });
     tokio::spawn(async move { axum::serve(http_listener, app).await.unwrap() });
 
-    Mobilink { quic_addr, public_base }
+    Mobilink {
+        quic_addr,
+        public_base,
+    }
 }
 
 /// Runs the real CLI flow (handshake + serve loop) and returns the session.
 async fn start_cli(server: &Mobilink, local_port: u16, no_eruda: bool) -> tunnel::TunnelSession {
     let endpoint = tls::insecure_client_endpoint().unwrap();
-    let session =
-        tunnel::connect_and_handshake(&endpoint, server.quic_addr, "localhost", local_port, no_eruda)
-            .await
-            .unwrap();
+    let session = tunnel::connect_and_handshake(
+        &endpoint,
+        server.quic_addr,
+        "localhost",
+        local_port,
+        no_eruda,
+    )
+    .await
+    .unwrap();
     tokio::spawn(tunnel::serve(session.connection.clone(), local_port));
     // Keep the endpoint alive for the whole test.
     std::mem::forget(endpoint);
@@ -106,7 +119,10 @@ async fn the_mobile_browser_sees_the_local_app_with_eruda_injected() {
     let response = browser.get(&session.public_url).send().await.unwrap();
     assert_eq!(response.status().as_u16(), 200);
     let html = response.text().await.unwrap();
-    assert!(html.contains("Hello Mobilink"), "local content must be relayed");
+    assert!(
+        html.contains("Hello Mobilink"),
+        "local content must be relayed"
+    );
     assert!(html.contains("eruda"), "Eruda must be injected into HTML");
 }
 

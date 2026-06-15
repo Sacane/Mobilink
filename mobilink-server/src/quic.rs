@@ -64,9 +64,9 @@ impl TunnelMap {
 }
 
 impl SessionOptions for TunnelMap {
-    fn eruda_disabled(&self, id: &SessionId) -> bool {
+    fn eruda_disabled(&self) -> bool {
         let inner = self.inner.lock().expect("tunnel map lock");
-        inner.get(id).is_some_and(|entry| entry.no_eruda)
+        inner.values().next().is_some_and(|entry| entry.no_eruda)
     }
 }
 

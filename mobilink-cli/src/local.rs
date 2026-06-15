@@ -16,17 +16,25 @@ pub async fn replay_locally(
 ) -> HttpResponseData {
     match try_replay(client, port, request).await {
         Ok(response) => response,
-        Err(error) => HttpResponseData {
-            status: 502,
-            headers: vec![(
-                "Content-Type".to_string(),
-                "text/plain; charset=utf-8".to_string(),
-            )],
-            body: format!(
-                "Mobilink: the local server on port {port} is unreachable.\n({error})\n"
-            )
-            .into_bytes(),
-        },
+        Err(error) => {
+            let mut chain = format!("{error}");
+            let mut src = std::error::Error::source(error.as_ref());
+            while let Some(e) = src {
+                chain.push_str(&format!("\n  caused by: {e}"));
+                src = e.source();
+            }
+            HttpResponseData {
+                status: 502,
+                headers: vec![(
+                    "Content-Type".to_string(),
+                    "text/plain; charset=utf-8".to_string(),
+                )],
+                body: format!(
+                    "Mobilink: the local server on port {port} is unreachable.\n{chain}\n"
+                )
+                .into_bytes(),
+            }
+        }
     }
 }
 
@@ -64,7 +72,11 @@ async fn try_replay(
         .collect();
     let body = response.bytes().await?.to_vec();
 
-    Ok(HttpResponseData { status, headers, body })
+    Ok(HttpResponseData {
+        status,
+        headers,
+        body,
+    })
 }
 
 #[cfg(test)]
@@ -124,6 +136,10 @@ mod tests {
             .iter()
             .find(|(k, _)| k.eq_ignore_ascii_case("x-powered-by"))
             .map(|(_, v)| v.as_str());
-        assert_eq!(powered, Some("local-app"), "response headers must be captured");
+        assert_eq!(
+            powered,
+            Some("local-app"),
+            "response headers must be captured"
+        );
     }
 }

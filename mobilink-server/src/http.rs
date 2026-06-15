@@ -17,7 +17,6 @@ use axum::middleware::{self, Next};
 use mobilink_core::http::{HttpRequestData, HttpResponseData};
 use mobilink_core::wire;
 
-use crate::router::parse_public_path;
 use crate::{PipelineError, RequestPipeline, ResponseTransformer, SessionOptions};
 
 /// Maximum accepted request body size (32 MiB).
@@ -46,7 +45,8 @@ pub struct ProxyState {
 }
 
 /// Builds the public-facing router. Every path goes through the proxy
-/// handler; anything that doesn't look like `/s/{id}...` is a 404.
+/// handler and is forwarded verbatim to the active tunnel; when no tunnel
+/// is connected the proxy returns a 404.
 /// A CORS middleware wraps all responses so browser fetch/XHR from any
 /// origin can reach the developer's local server without being blocked.
 pub fn public_router(state: ProxyState) -> Router {
@@ -90,19 +90,19 @@ fn cors_preflight_response() -> Response<Body> {
 
 async fn proxy_handler(State(state): State<ProxyState>, request: Request<Body>) -> Response<Body> {
     let (parts, body) = request.into_parts();
+    // Whole-host routing: the full request path is forwarded verbatim to the
+    // developer's local server, so the dev server's absolute asset paths
+    // (`/_nuxt/...`, `/@vite/client`) resolve straight back through the tunnel.
+    // The active tunnel is resolved by the pipeline, not parsed from the path.
     let public_path = parts.uri.path().to_string();
-
-    let Some((session_id, local_path)) = parse_public_path(&public_path) else {
-        return text_response(StatusCode::NOT_FOUND, "No active session for this URL.\n");
-    };
 
     let Ok(body_bytes) = axum::body::to_bytes(body, MAX_BODY_BYTES).await else {
         return text_response(StatusCode::PAYLOAD_TOO_LARGE, "Request body too large.\n");
     };
 
     let target = match parts.uri.query() {
-        Some(query) => format!("{local_path}?{query}"),
-        None => local_path,
+        Some(query) => format!("{public_path}?{query}"),
+        None => public_path.clone(),
     };
 
     let headers = parts
@@ -152,7 +152,7 @@ async fn proxy_handler(State(state): State<ProxyState>, request: Request<Body>) 
                     "The tunnel returned an unreadable response.\n",
                 );
             };
-            let response_data = if state.options.eruda_disabled(&session_id) {
+            let response_data = if state.options.eruda_disabled() {
                 response_data
             } else {
                 state.transformer.transform(response_data)
@@ -197,7 +197,6 @@ mod tests {
     use crate::ForwardError;
     use crate::transform::ErudaInjector;
     use http_body_util::BodyExt;
-    use mobilink_core::session::SessionId;
     use std::sync::Mutex;
     use tower::ServiceExt;
 
@@ -241,14 +240,14 @@ mod tests {
 
     struct ErudaAlwaysOn;
     impl SessionOptions for ErudaAlwaysOn {
-        fn eruda_disabled(&self, _id: &SessionId) -> bool {
+        fn eruda_disabled(&self) -> bool {
             false
         }
     }
 
     struct ErudaAlwaysOff;
     impl SessionOptions for ErudaAlwaysOff {
-        fn eruda_disabled(&self, _id: &SessionId) -> bool {
+        fn eruda_disabled(&self) -> bool {
             true
         }
     }
@@ -284,20 +283,13 @@ mod tests {
         (status, String::from_utf8_lossy(&body).to_string())
     }
 
-    fn session_uri(suffix: &str) -> (SessionId, String) {
-        let id = SessionId::new();
-        let uri = format!("/s/{id}{suffix}");
-        (id, uri)
-    }
-
     // --- Scenario: the mobile browser gets the developer's response ---
 
     #[tokio::test]
     async fn returns_the_local_server_response_with_eruda_injected() {
         let pipeline = SpyPipeline::new(StubOutcome::Respond(html_page()));
-        let (_, uri) = session_uri("");
 
-        let (status, body) = send(app(Arc::clone(&pipeline), false), &uri).await;
+        let (status, body) = send(app(Arc::clone(&pipeline), false), "/").await;
 
         assert_eq!(status, StatusCode::OK);
         assert!(
@@ -308,11 +300,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rewrites_the_target_path_and_query_for_the_local_server() {
+    async fn forwards_the_full_request_path_and_query_verbatim() {
         let pipeline = SpyPipeline::new(StubOutcome::Respond(html_page()));
-        let (_, uri) = session_uri("/api/items?page=2");
 
-        send(app(Arc::clone(&pipeline), false), &uri).await;
+        // No /s/<id> prefix: the path reaches the local server untouched.
+        send(app(Arc::clone(&pipeline), false), "/api/items?page=2").await;
 
         let seen = pipeline.seen.lock().unwrap();
         let (_, request) = seen.as_ref().expect("pipeline must be called");
@@ -320,23 +312,25 @@ mod tests {
         assert_eq!(request.method, "GET");
     }
 
+    #[tokio::test]
+    async fn forwards_absolute_asset_paths_without_a_session_prefix() {
+        let pipeline = SpyPipeline::new(StubOutcome::Respond(html_page()));
+
+        // The kind of absolute asset path a Vite/Nuxt dev server emits.
+        send(app(Arc::clone(&pipeline), false), "/_nuxt/@vite/client").await;
+
+        let seen = pipeline.seen.lock().unwrap();
+        let (_, request) = seen.as_ref().expect("pipeline must be called");
+        assert_eq!(request.target, "/_nuxt/@vite/client");
+    }
+
     // --- Scenario: 404 when no session matches ---
 
     #[tokio::test]
-    async fn returns_404_when_the_path_matches_no_session() {
+    async fn returns_404_when_no_tunnel_is_active() {
         let pipeline = SpyPipeline::new(StubOutcome::SessionMissing);
-        let (_, uri) = session_uri("");
 
-        let (status, _) = send(app(pipeline, false), &uri).await;
-
-        assert_eq!(status, StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn returns_404_for_paths_outside_the_session_namespace() {
-        let pipeline = SpyPipeline::new(StubOutcome::Respond(html_page()));
-
-        let (status, _) = send(app(pipeline, false), "/health").await;
+        let (status, _) = send(app(pipeline, false), "/").await;
 
         assert_eq!(status, StatusCode::NOT_FOUND);
     }
@@ -346,9 +340,8 @@ mod tests {
     #[tokio::test]
     async fn returns_502_when_the_tunnel_is_unavailable() {
         let pipeline = SpyPipeline::new(StubOutcome::TunnelDown);
-        let (_, uri) = session_uri("");
 
-        let (status, _) = send(app(pipeline, false), &uri).await;
+        let (status, _) = send(app(pipeline, false), "/").await;
 
         assert_eq!(status, StatusCode::BAD_GATEWAY);
     }
@@ -358,9 +351,8 @@ mod tests {
     #[tokio::test]
     async fn does_not_inject_eruda_when_the_session_disabled_it() {
         let pipeline = SpyPipeline::new(StubOutcome::Respond(html_page()));
-        let (_, uri) = session_uri("");
 
-        let (status, body) = send(app(pipeline, true), &uri).await;
+        let (status, body) = send(app(pipeline, true), "/").await;
 
         assert_eq!(status, StatusCode::OK);
         assert!(body.contains("Local app"));
@@ -375,10 +367,9 @@ mod tests {
     #[tokio::test]
     async fn cors_headers_are_present_on_successful_proxy_response() {
         let pipeline = SpyPipeline::new(StubOutcome::Respond(html_page()));
-        let (_, uri) = session_uri("");
 
         let response = app(Arc::clone(&pipeline), false)
-            .oneshot(Request::builder().uri(&uri).body(Body::empty()).unwrap())
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await
             .unwrap();
 
@@ -395,10 +386,9 @@ mod tests {
     #[tokio::test]
     async fn cors_headers_are_present_on_error_responses() {
         let pipeline = SpyPipeline::new(StubOutcome::SessionMissing);
-        let (_, uri) = session_uri("");
 
         let response = app(pipeline, false)
-            .oneshot(Request::builder().uri(&uri).body(Body::empty()).unwrap())
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await
             .unwrap();
 
@@ -415,13 +405,12 @@ mod tests {
     #[tokio::test]
     async fn options_preflight_returns_no_content_with_cors_headers() {
         let pipeline = SpyPipeline::new(StubOutcome::SessionMissing);
-        let (_, uri) = session_uri("/api/data");
 
         let response = app(pipeline, false)
             .oneshot(
                 Request::builder()
                     .method("OPTIONS")
-                    .uri(&uri)
+                    .uri("/api/data")
                     .body(Body::empty())
                     .unwrap(),
             )

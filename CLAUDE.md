@@ -58,8 +58,8 @@ cargo fmt --all
 
 **Request flow:**
 1. CLI opens a persistent QUIC connection to the developer's own server (`quinn`)
-2. Server assigns a session ID and public URL (e.g. `https://my-vps.com/s/abc123`)
-3. Inbound HTTP request from mobile → server routes it to the correct QUIC stream → CLI forwards to localhost
+2. Server assigns a session ID and dedicates the public host to it (whole-host routing); the public URL is the host root (e.g. `https://my-vps.com`)
+3. Inbound HTTP request from mobile → server forwards the full path verbatim to the active session's QUIC stream → CLI forwards to localhost
 4. Response travels back; server intercepts `text/html` responses to inject Eruda debug script
 5. CLI displays the QR code and live request log in the terminal
 

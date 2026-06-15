@@ -40,10 +40,14 @@ pub trait HttpRouter: Send + Sync {
     fn resolve_session(&self, path: &str) -> Option<Session>;
 }
 
-/// Per-session options negotiated during the tunnel handshake.
+/// Options for the active tunnel, negotiated during the handshake.
+///
+/// Whole-host routing dedicates the public host to a single active tunnel,
+/// so there is no session id to disambiguate — the option applies to the
+/// one live session.
 pub trait SessionOptions: Send + Sync {
     /// True when the developer started the CLI with `--no-eruda`.
-    fn eruda_disabled(&self, id: &SessionId) -> bool;
+    fn eruda_disabled(&self) -> bool;
 }
 
 /// Transforms an HTTP response on its way back to the mobile browser.
@@ -104,6 +108,11 @@ pub trait SessionRegistry: Send + Sync {
     /// Returns None if no session with that ID exists.
     fn get_session(&self, id: &SessionId) -> Option<Session>;
 
+    /// Returns the single active session under whole-host routing.
+    /// When several sessions exist, the most recently opened one wins.
+    /// Returns None when no tunnel is currently connected.
+    fn active_session(&self) -> Option<Session>;
+
     /// Attempts to register a session that already has an ID.
     /// Returns Err(DuplicateId) if a session with the same ID is already active.
     fn register_session(&self, session: Session) -> Result<Session, SessionError>;
@@ -146,6 +155,10 @@ mod tests {
 
         fn get_session(&self, id: &SessionId) -> Option<Session> {
             self.sessions.lock().ok()?.get(id).cloned()
+        }
+
+        fn active_session(&self) -> Option<Session> {
+            self.sessions.lock().ok()?.values().next().cloned()
         }
 
         fn register_session(&self, session: Session) -> Result<Session, SessionError> {

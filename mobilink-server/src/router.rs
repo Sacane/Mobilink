@@ -1,31 +1,15 @@
 use std::sync::Arc;
 
-use mobilink_core::session::{Session, SessionId};
+use mobilink_core::session::Session;
 
 use crate::{HttpRouter, SessionRegistry};
 
-/// Splits a public URL path into the session ID and the path intended for
-/// the developer's local server.
+/// Routes incoming HTTP requests to the active tunnel session.
 ///
-/// `/s/{id}` and `/s/{id}/` map to a local path of `/`;
-/// `/s/{id}/css/style.css` maps to `/css/style.css`.
-pub fn parse_public_path(path: &str) -> Option<(SessionId, String)> {
-    let rest = path.strip_prefix("/s/")?;
-    let (id_part, local_path) = match rest.find('/') {
-        Some(slash) => (&rest[..slash], &rest[slash..]),
-        None => (rest, "/"),
-    };
-    let session_id = id_part.parse().ok()?;
-    let local_path = if local_path.is_empty() || local_path == "/" {
-        "/".to_string()
-    } else {
-        local_path.to_string()
-    };
-    Some((session_id, local_path))
-}
-
-/// Routes incoming HTTP requests to the correct active session
-/// by parsing the session ID from the URL path.
+/// Under whole-host routing the public host is dedicated to a single tunnel,
+/// so the session is resolved independently of the request path — every path
+/// (including absolute asset paths like `/_nuxt/...`) reaches the same
+/// developer's local server.
 pub struct SessionRouter {
     registry: Arc<dyn SessionRegistry>,
 }
@@ -37,9 +21,8 @@ impl SessionRouter {
 }
 
 impl HttpRouter for SessionRouter {
-    fn resolve_session(&self, path: &str) -> Option<Session> {
-        let (session_id, _) = parse_public_path(path)?;
-        self.registry.get_session(&session_id)
+    fn resolve_session(&self, _path: &str) -> Option<Session> {
+        self.registry.active_session()
     }
 }
 
@@ -55,41 +38,31 @@ mod tests {
     }
 
     #[test]
-    fn resolves_a_session_when_the_path_has_a_subpath() {
+    fn resolves_the_active_session_for_any_path() {
         let (registry, session) = registry_with_session();
         let router = SessionRouter::new(registry);
 
-        let path = format!("/s/{}/css/style.css", session.id);
-        let resolved = router.resolve_session(&path);
+        // An absolute asset path the dev server emits, with no /s/<id> prefix.
+        let resolved = router.resolve_session("/_nuxt/@vite/client");
 
         assert_eq!(resolved.map(|s| s.id), Some(session.id));
     }
 
     #[test]
-    fn parse_public_path_extracts_id_and_local_path() {
-        let (_, session) = registry_with_session();
+    fn resolves_the_active_session_for_the_root_path() {
+        let (registry, session) = registry_with_session();
+        let router = SessionRouter::new(registry);
 
-        let path = format!("/s/{}/api/items", session.id);
-        let (id, local) = parse_public_path(&path).expect("path should parse");
+        let resolved = router.resolve_session("/");
 
-        assert_eq!(id, session.id);
-        assert_eq!(local, "/api/items");
+        assert_eq!(resolved.map(|s| s.id), Some(session.id));
     }
 
     #[test]
-    fn parse_public_path_maps_bare_session_path_to_root() {
-        let (_, session) = registry_with_session();
+    fn resolves_nothing_when_no_tunnel_is_active() {
+        let registry = Arc::new(InMemorySessionRegistry::new("my-vps.com"));
+        let router = SessionRouter::new(registry);
 
-        let bare = format!("/s/{}", session.id);
-        let trailing = format!("/s/{}/", session.id);
-
-        assert_eq!(parse_public_path(&bare).expect("bare").1, "/");
-        assert_eq!(parse_public_path(&trailing).expect("trailing").1, "/");
-    }
-
-    #[test]
-    fn parse_public_path_rejects_foreign_paths() {
-        assert!(parse_public_path("/health").is_none());
-        assert!(parse_public_path("/s/not-a-uuid/whatever").is_none());
+        assert!(router.resolve_session("/anything").is_none());
     }
 }

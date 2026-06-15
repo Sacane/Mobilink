@@ -27,7 +27,10 @@ mod tests {
     fn qr_code_is_rendered_as_multiline_unicode_blocks() {
         let qr = qr_string("https://my-vps.com/s/abc123").expect("URL fits in a QR code");
 
-        assert!(qr.lines().count() > 10, "a QR code spans many terminal lines");
+        assert!(
+            qr.lines().count() > 10,
+            "a QR code spans many terminal lines"
+        );
         assert!(
             qr.contains('█') || qr.contains('▀') || qr.contains('▄'),
             "the QR code is drawn with block characters"

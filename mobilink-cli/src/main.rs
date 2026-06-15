@@ -18,7 +18,11 @@ use mobilink_cli::{tls, tunnel, ui};
 /// address fails immediately. Preferring IPv4 fixes the local dev workflow
 /// without affecting production use (VPS hostnames resolve to IPv4 anyway).
 fn prefer_ipv4(addrs: &[SocketAddr]) -> Option<SocketAddr> {
-    addrs.iter().find(|a| a.is_ipv4()).or_else(|| addrs.first()).copied()
+    addrs
+        .iter()
+        .find(|a| a.is_ipv4())
+        .or_else(|| addrs.first())
+        .copied()
 }
 
 #[cfg(test)]
@@ -27,8 +31,10 @@ mod tests {
 
     #[test]
     fn resolver_prefers_ipv4_when_both_families_are_present() {
-        let addrs: Vec<SocketAddr> =
-            vec!["[::1]:4433".parse().unwrap(), "127.0.0.1:4433".parse().unwrap()];
+        let addrs: Vec<SocketAddr> = vec![
+            "[::1]:4433".parse().unwrap(),
+            "127.0.0.1:4433".parse().unwrap(),
+        ];
         assert_eq!(prefer_ipv4(&addrs), Some("127.0.0.1:4433".parse().unwrap()));
     }
 
@@ -60,10 +66,11 @@ async fn main() -> ExitCode {
 
 async fn run(args: StartArgs) -> Result<(), Box<dyn std::error::Error>> {
     // Resolve the server address (DNS or literal IP), preferring IPv4.
-    let addrs: Vec<SocketAddr> =
-        tokio::net::lookup_host((args.server.as_str(), args.server_port)).await?.collect();
-    let server_addr = prefer_ipv4(&addrs)
-        .ok_or_else(|| format!("could not resolve host '{}'", args.server))?;
+    let addrs: Vec<SocketAddr> = tokio::net::lookup_host((args.server.as_str(), args.server_port))
+        .await?
+        .collect();
+    let server_addr =
+        prefer_ipv4(&addrs).ok_or_else(|| format!("could not resolve host '{}'", args.server))?;
 
     let endpoint = tls::insecure_client_endpoint()?;
 
@@ -83,7 +90,10 @@ async fn run(args: StartArgs) -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     println!();
-    println!("  Tunnel ready!  localhost:{}  \u{21d2}  {}", args.port, session.public_url);
+    println!(
+        "  Tunnel ready!  localhost:{}  \u{21d2}  {}",
+        args.port, session.public_url
+    );
     println!();
     if let Some(qr) = ui::qr_string(&session.public_url) {
         println!("{qr}");
