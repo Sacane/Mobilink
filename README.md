@@ -97,9 +97,9 @@ Scan the QR code displayed in the terminal from your phone.
 
 ## Documentation
 
-- **[User guide](doc/USER_GUIDE.md)** — install, run, flags, troubleshooting
-- **[Technical guide](doc/TECHNICAL_GUIDE.md)** — architecture, wire protocol, design choices
-- **[Roadmap](doc/PLAN.md)** · **[TDD rules](doc/TDD.md)** · **[Gherkin scenarios](docs/gherkins/)**
+- **[User guide](docs/USER_GUIDE.md)** — install, run, flags, troubleshooting
+- **[Technical guide](docs/TECHNICAL_GUIDE.md)** — architecture, wire protocol, design choices
+- **[Roadmap](docs/PLAN.md)** · **[TDD rules](docs/TDD.md)** · **[Gherkin scenarios](docs/gherkins/)**
 
 ---
 

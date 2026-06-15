@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Mobilink is a self-hosted, mobile-first network tunnel that exposes localhost via a public URL. Unlike simple TCP tunnels (ngrok-style), it is an **HTTP-aware proxy** that understands the traffic passing through it.
 
-See [doc/PLAN.md](doc/PLAN.md) for the full architecture and roadmap.
-See [doc/README.md](doc/README.md) for the official project documentation.
-See [doc/TDD.md](doc/TDD.md) for the mandatory TDD rules every agent must follow.
+See [docs/PLAN.md](docs/PLAN.md) for the full architecture and roadmap.
+See [README.md](README.md) for the official project documentation.
+See [docs/TDD.md](docs/TDD.md) for the mandatory TDD rules every agent must follow.
 
 ## Workspace structure
 
@@ -79,7 +79,7 @@ A Mobilink-operated cloud mode may be added later as a layer on top of the same 
 
 ## TDD — Non-negotiable rule
 
-**Every feature must follow the Red → Green → Refactor cycle defined in [doc/TDD.md](doc/TDD.md).**
+**Every feature must follow the Red → Green → Refactor cycle defined in [docs/TDD.md](docs/TDD.md).**
 
 - 🔴 Write a failing test that expresses business intent before any implementation
 - 🟢 Write the minimum code to make it pass
@@ -89,4 +89,4 @@ No implementation code without a prior failing test. No exceptions.
 
 ## Scope constraints (MVP)
 
-No authentication, no user accounts, no monetization, no native mobile app, no web dashboard. Keep features to the roadmap in `doc/PLAN.md`.
+No authentication, no user accounts, no monetization, no native mobile app, no web dashboard. Keep features to the roadmap in `docs/PLAN.md`.

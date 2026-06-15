@@ -114,7 +114,7 @@ through the tunnel, so the prefix no longer interferes with routing.
 Gate it behind an environment variable that you only set when running through
 Mobilink, so production keeps clean history-mode URLs.
 
-**Nuxt** (`nuxt.config.ts`):
+### Nuxt (`nuxt.config.ts`)
 
 ```ts
 export default defineNuxtConfig({
@@ -133,7 +133,7 @@ MOBILINK=1 npm run dev
 npm run dev
 ```
 
-**Vue Router** (standalone):
+### Vue (Vue Router 4)
 
 ```ts
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
@@ -145,8 +145,60 @@ const history = import.meta.env.VITE_MOBILINK
 const router = createRouter({ history, routes })
 ```
 
-**React Router**: use `<HashRouter>` instead of `<BrowserRouter>` when the same
-env flag is set.
+### React (React Router v6.4+)
+
+```jsx
+// main.jsx — pick the router factory from the same env flag
+import {
+  createHashRouter,
+  createBrowserRouter,
+  RouterProvider,
+} from 'react-router-dom'
+
+const makeRouter = import.meta.env.VITE_MOBILINK
+  ? createHashRouter
+  : createBrowserRouter
+
+createRoot(document.getElementById('root')).render(
+  <RouterProvider router={makeRouter(routes)} />,
+)
+
+// Component API: swap <BrowserRouter> for <HashRouter> under the same flag.
+```
+
+### Angular (Angular Router)
+
+```ts
+// app.config.ts — standalone bootstrap (Angular 17+)
+import { provideRouter, withHashLocation } from '@angular/router'
+import { environment } from './environments/environment'
+
+export const appConfig = {
+  providers: [
+    provideRouter(routes, ...(environment.mobilink ? [withHashLocation()] : [])),
+  ],
+}
+
+// NgModule style: RouterModule.forRoot(routes, { useHash: true })
+```
+
+Add a `mobilink` flag to a dedicated `environment.mobilink.ts` and serve it with
+`ng serve --configuration mobilink`.
+
+### Svelte (SvelteKit 2.17+)
+
+```js
+// svelte.config.js
+export default {
+  kit: {
+    router: { type: process.env.MOBILINK ? 'hash' : 'pathname' },
+  },
+}
+```
+
+For a plain Vite + Svelte SPA (no SvelteKit), use a hash-based router such as
+[`svelte-spa-router`](https://github.com/ItalyPaleAle/svelte-spa-router), which
+routes on the hash by default.
 
 Then start your tunnel as usual:
 
@@ -155,7 +207,10 @@ Then start your tunnel as usual:
 ```
 
 > Server-rendered apps and sites using **relative** asset paths don't need
-> this — only client-side routers in history mode are affected.
+> this — only client-side routers in history mode are affected. Hash routing
+> fixes navigation, not assets: if your pages load assets with absolute paths
+> (`/assets/app.js`), also set a relative base — e.g. Vite `base: './'`,
+> Angular `<base href="./">`.
 
 ---
 
