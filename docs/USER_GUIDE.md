@@ -104,6 +104,8 @@ beyond your server.
 - **Sessions are URL-path based** (`/s/{id}/…`). Pages using absolute paths
   (`/css/app.css`) will resolve them against the server root and break.
   Apps using relative paths work fine. Subdomain routing is on the roadmap.
+  For single-page apps, switch your router to **hash mode** — see
+  [§6 Single-page app routing](#6-single-page-app-routing-hash-mode).
 - **TLS between CLI and server**: the tunnel is encrypted, but the server's
   certificate is self-signed and not verified by the CLI (MVP). Certificate
   pinning is planned.
@@ -116,7 +118,85 @@ beyond your server.
 
 ---
 
-## 6. Troubleshooting
+## 6. Single-page app routing (hash mode)
+
+Because sessions live under a path prefix (`/s/{id}/…`, see the limitation
+above), SPA routers that use the HTML5 **history** API produce absolute URLs
+(`/dashboard`, `/users/42`). Those resolve against the server root, escape your
+session and 404 on the next navigation.
+
+The fix is **hash routing**: routes live in the URL fragment
+(`…/s/{id}/#/dashboard`), which the browser never sends to the server, so they
+keep working behind any prefix. Switch your dev build to hash mode while you
+test through Mobilink.
+
+### React (React Router v6.4+)
+
+```jsx
+// main.jsx — swap createBrowserRouter for createHashRouter
+import { createHashRouter, RouterProvider } from "react-router-dom";
+
+const router = createHashRouter(routes);
+
+createRoot(document.getElementById("root")).render(
+  <RouterProvider router={router} />,
+);
+
+// Older component API: use <HashRouter> instead of <BrowserRouter>
+//   import { HashRouter } from "react-router-dom";
+//   <HashRouter><App /></HashRouter>
+```
+
+### Vue (Vue Router 4)
+
+```js
+// router/index.js — swap createWebHistory for createWebHashHistory
+import { createRouter, createWebHashHistory } from "vue-router";
+
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes,
+});
+
+export default router;
+```
+
+### Angular (Angular Router)
+
+```ts
+// app.config.ts — standalone bootstrap (Angular 17+)
+import { provideRouter, withHashLocation } from "@angular/router";
+
+export const appConfig = {
+  providers: [provideRouter(routes, withHashLocation())],
+};
+
+// NgModule style:
+//   RouterModule.forRoot(routes, { useHash: true })
+```
+
+### Svelte (SvelteKit 2.17+)
+
+```js
+// svelte.config.js
+export default {
+  kit: {
+    router: { type: "hash" },
+  },
+};
+```
+
+For a plain Vite + Svelte SPA (no SvelteKit), use a hash-based router such as
+[`svelte-spa-router`](https://github.com/ItalyPaleAle/svelte-spa-router), which
+routes on the hash by default.
+
+> **Hash routing fixes navigation, not assets.** If your pages also load assets
+> with absolute paths (`/assets/app.js`), set your dev server's base to a
+> relative path too — e.g. Vite `base: "./"`, Angular `<base href="./">`.
+
+---
+
+## 7. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
