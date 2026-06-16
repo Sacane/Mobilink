@@ -37,6 +37,7 @@ pub fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, WireError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::AuthMode;
     use crate::http::{HttpRequestData, HttpResponseData};
     use crate::message::{ClientMessage, ServerMessage};
     use crate::session::SessionId;
@@ -46,6 +47,7 @@ mod tests {
         let hello = ClientMessage::Hello {
             local_port: 3000,
             no_eruda: true,
+            auth: AuthMode::Cookie,
         };
 
         let bytes = encode(&hello).expect("encoding should succeed");
@@ -55,9 +57,11 @@ mod tests {
             ClientMessage::Hello {
                 local_port,
                 no_eruda,
+                auth,
             } => {
                 assert_eq!(local_port, 3000);
                 assert!(no_eruda);
+                assert_eq!(auth, AuthMode::Cookie);
             }
         }
     }

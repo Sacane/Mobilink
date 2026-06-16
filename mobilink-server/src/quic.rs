@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use quinn::Endpoint;
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 
+use mobilink_core::auth::AuthMode;
 use mobilink_core::message::{ClientMessage, ServerMessage};
 use mobilink_core::session::SessionId;
 use mobilink_core::wire;
@@ -28,6 +29,7 @@ pub const MAX_FRAME_BYTES: usize = mobilink_core::wire::MAX_FRAME_BYTES;
 struct TunnelEntry {
     connection: quinn::Connection,
     no_eruda: bool,
+    auth: AuthMode,
 }
 
 /// Thread-safe map of active tunnels, keyed by session.
@@ -41,13 +43,14 @@ impl TunnelMap {
         Self::default()
     }
 
-    fn insert(&self, id: SessionId, connection: quinn::Connection, no_eruda: bool) {
+    fn insert(&self, id: SessionId, connection: quinn::Connection, no_eruda: bool, auth: AuthMode) {
         let mut inner = self.inner.lock().expect("tunnel map lock");
         inner.insert(
             id,
             TunnelEntry {
                 connection,
                 no_eruda,
+                auth,
             },
         );
     }
@@ -67,6 +70,15 @@ impl SessionOptions for TunnelMap {
     fn eruda_disabled(&self) -> bool {
         let inner = self.inner.lock().expect("tunnel map lock");
         inner.values().next().is_some_and(|entry| entry.no_eruda)
+    }
+
+    fn auth_mode(&self) -> AuthMode {
+        let inner = self.inner.lock().expect("tunnel map lock");
+        inner
+            .values()
+            .next()
+            .map(|entry| entry.auth)
+            .unwrap_or_default()
     }
 }
 
@@ -161,6 +173,7 @@ async fn handle_connection(
     let ClientMessage::Hello {
         local_port,
         no_eruda,
+        auth,
     } = wire::decode(&hello_bytes)?;
 
     let response = handshake
@@ -172,7 +185,7 @@ async fn handle_connection(
     } = &response;
     let session_id = session_id.clone();
 
-    tunnels.insert(session_id.clone(), connection.clone(), no_eruda);
+    tunnels.insert(session_id.clone(), connection.clone(), no_eruda, auth);
     send.write_all(&wire::encode(&response)?).await?;
     send.finish()?;
 

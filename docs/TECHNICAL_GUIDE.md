@@ -81,6 +81,7 @@ mobile browser
 axum fallback handler (http.rs)
    │  path forwarded verbatim → target "/api/items?page=2"
    │  Request → HttpRequestData   (strip host/connection/accept-encoding/…)
+   │           + inject X-Forwarded-Proto / X-Forwarded-Host
    │  wire::encode
    ▼
 RequestDispatcher::handle          (spawn_blocking)
@@ -94,8 +95,9 @@ CLI serve loop (tunnel.rs)         one tokio task per stream
    │  response → wire::encode → same stream back
    ▼
 axum handler
-   │  wire::decode → ErudaInjector::transform (unless --no-eruda)
+   │  wire::decode → cookie rewrite (if --auth cookie) → ErudaInjector
    │  HttpResponseData → Response  (recompute content-length)
+   │  CORS layer: reflect Origin + allow-credentials, else wildcard
    ▼
 mobile browser
 ```
@@ -107,6 +109,18 @@ hangs).
 `accept-encoding` is stripped from forwarded requests so local responses
 arrive uncompressed — that is what keeps HTML injectable. Compressed or
 non-UTF-8 HTML passes through untouched rather than corrupted.
+
+**Auth-awareness.** Because the app is served under a different, HTTPS host,
+the proxy makes authentication survive the hop. It injects
+`X-Forwarded-Proto`/`X-Forwarded-Host` (honoring any upstream proxy's values)
+so the local app reconstructs the real scheme + host — secure-cookie logic,
+login redirects and Origin/CSRF checks then line up. CORS reflects the request
+`Origin` with `Access-Control-Allow-Credentials: true` (a wildcard is illegal
+with credentials, so credentialed cross-origin fetch/XHR would otherwise be
+blocked). `--auth cookie` additionally rewrites every `Set-Cookie` to
+`Secure; SameSite=None` and drops `Domain`, so the browser stores and resends
+the session cookie. The `AuthMode` is declared with `--auth`, carried in the
+`Hello` handshake, and stored per-session in the `TunnelMap`.
 
 ---
 

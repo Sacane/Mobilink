@@ -62,6 +62,7 @@ host (see the one-active-tunnel note in section 6).
 | `--server` | yes | Host name or IP of **your** Mobilink server |
 | `--server-port` | no (4433) | QUIC port of the server |
 | `--no-eruda` | no | Disable the mobile debug console injection |
+| `--auth` | no (`passthrough`) | How the tunnel adapts to your app's auth: `passthrough`, `cookie`, or `bearer` (see §6) |
 
 The terminal then shows:
 
@@ -118,7 +119,51 @@ out of the box — no hash routing, no relative-base config needed.**
 
 ---
 
-## 6. What you should know (MVP limitations)
+## 6. Authentication & sessions (login, cookies)
+
+If your local app has a login and you reach it **through the tunnel** (a public
+`https://` host instead of `localhost`), authentication can break with `401`s
+even though it works locally. Two things change across the tunnel: the browser
+is now on a different, HTTPS host, and your API may be called cross-origin.
+Mobilink handles most of this automatically, plus one opt-in for cookie
+sessions.
+
+**Always on (nothing to configure):**
+
+- **Forwarded headers.** Every request reaches your app with
+  `X-Forwarded-Proto` and `X-Forwarded-Host` set to the real public scheme and
+  host. Frameworks that honor them then build correct `https://` login
+  redirects, treat the connection as secure, and pass Origin/CSRF checks.
+  - For **Spring**, enable this once in `application.properties`:
+    `server.forward-headers-strategy=framework`
+  - Rails: `config.hosts`; Django: `SECURE_PROXY_SSL_HEADER` + `USE_X_FORWARDED_HOST`;
+    most reverse-proxy-aware stacks have an equivalent switch.
+- **Credential-safe CORS.** For cross-origin API calls with credentials
+  (`fetch(..., { credentials: 'include' })` or `Authorization`), Mobilink
+  reflects the request `Origin` and returns `Access-Control-Allow-Credentials:
+  true` — a wildcard `*` is illegal with credentials and would block the call.
+
+**Opt-in with `--auth`:**
+
+| Mode | Use it when | What it does |
+|---|---|---|
+| `passthrough` (default) | No login, or it already works | Touches nothing |
+| `cookie` | Session lives in a **cookie** (`JSESSIONID`, `connect.sid`, `laravel_session`, …) | Rewrites every `Set-Cookie` to `Secure; SameSite=None` and drops `Domain=...`, so the browser stores **and** resends the session cookie across the public-host hop |
+| `bearer` | Token in the `Authorization` header | No cookie rewriting; relies on the credential-safe CORS above |
+
+```bash
+mobilink start --port 8080 --server my-vps.com --auth cookie
+```
+
+**Diagnosing a `401`** (Eruda's Network tab makes this quick): on the login
+response, inspect `Set-Cookie`. If the next request goes out **without** the
+`Cookie` header, the browser rejected the cookie — use `--auth cookie`. If the
+cookie **is** sent and you still get `401`, it's a server-side host/Origin
+check — make sure your framework honors the forwarded headers above.
+
+---
+
+## 7. What you should know (MVP limitations)
 
 - **One active tunnel per server.** The public host is dedicated to the most
   recently connected tunnel (whole-host routing), so one server proxies one
@@ -138,7 +183,7 @@ out of the box — no hash routing, no relative-base config needed.**
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|

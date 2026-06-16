@@ -25,31 +25,6 @@ fn prefer_ipv4(addrs: &[SocketAddr]) -> Option<SocketAddr> {
         .copied()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resolver_prefers_ipv4_when_both_families_are_present() {
-        let addrs: Vec<SocketAddr> = vec![
-            "[::1]:4433".parse().unwrap(),
-            "127.0.0.1:4433".parse().unwrap(),
-        ];
-        assert_eq!(prefer_ipv4(&addrs), Some("127.0.0.1:4433".parse().unwrap()));
-    }
-
-    #[test]
-    fn resolver_falls_back_to_ipv6_when_no_ipv4_is_available() {
-        let addrs: Vec<SocketAddr> = vec!["[::1]:4433".parse().unwrap()];
-        assert_eq!(prefer_ipv4(&addrs), Some("[::1]:4433".parse().unwrap()));
-    }
-
-    #[test]
-    fn resolver_returns_none_for_an_empty_list() {
-        assert_eq!(prefer_ipv4(&[]), None);
-    }
-}
-
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -80,6 +55,7 @@ async fn run(args: StartArgs) -> Result<(), Box<dyn std::error::Error>> {
         &args.server,
         args.port,
         args.no_eruda,
+        args.auth,
     )
     .await
     .map_err(|error| {
@@ -122,4 +98,29 @@ async fn run(args: StartArgs) -> Result<(), Box<dyn std::error::Error>> {
     endpoint.wait_idle().await;
     println!("  Session closed. Bye!");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolver_prefers_ipv4_when_both_families_are_present() {
+        let addrs: Vec<SocketAddr> = vec![
+            "[::1]:4433".parse().unwrap(),
+            "127.0.0.1:4433".parse().unwrap(),
+        ];
+        assert_eq!(prefer_ipv4(&addrs), Some("127.0.0.1:4433".parse().unwrap()));
+    }
+
+    #[test]
+    fn resolver_falls_back_to_ipv6_when_no_ipv4_is_available() {
+        let addrs: Vec<SocketAddr> = vec!["[::1]:4433".parse().unwrap()];
+        assert_eq!(prefer_ipv4(&addrs), Some("[::1]:4433".parse().unwrap()));
+    }
+
+    #[test]
+    fn resolver_returns_none_for_an_empty_list() {
+        assert_eq!(prefer_ipv4(&[]), None);
+    }
 }

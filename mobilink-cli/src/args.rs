@@ -5,6 +5,7 @@
 //! attempt.
 
 use clap::{Args, Parser, Subcommand};
+use mobilink_core::auth::AuthMode;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -40,6 +41,13 @@ pub struct StartArgs {
     /// Do not inject the Eruda debug console into HTML pages
     #[arg(long)]
     pub no_eruda: bool,
+
+    /// How the tunnel adapts to your app's authentication:
+    /// `passthrough` (default, touch nothing), `cookie` (rewrite Set-Cookie to
+    /// Secure; SameSite=None so sessions survive the tunnel), or `bearer`
+    /// (token auth; relies on credential-safe CORS only).
+    #[arg(long, default_value_t = AuthMode::Passthrough)]
+    pub auth: AuthMode,
 }
 
 #[cfg(test)]
@@ -67,6 +75,47 @@ mod tests {
         assert_eq!(args.server, "my-vps.com");
         assert_eq!(args.server_port, 4433, "QUIC port defaults to 4433");
         assert!(!args.no_eruda, "Eruda is enabled by default");
+        assert_eq!(
+            args.auth,
+            AuthMode::Passthrough,
+            "auth defaults to passthrough"
+        );
+    }
+
+    #[test]
+    fn auth_mode_flag_is_parsed() {
+        let cli = parse(&[
+            "mobilink",
+            "start",
+            "--port",
+            "3000",
+            "--server",
+            "my-vps.com",
+            "--auth",
+            "cookie",
+        ])
+        .expect("valid arguments must parse");
+        let Command::Start(args) = cli.command;
+        assert_eq!(args.auth, AuthMode::Cookie);
+    }
+
+    #[test]
+    fn unknown_auth_mode_is_rejected_with_usage_error() {
+        let error = parse(&[
+            "mobilink",
+            "start",
+            "--port",
+            "3000",
+            "--server",
+            "my-vps.com",
+            "--auth",
+            "wizardry",
+        ])
+        .expect_err("unknown --auth value must be rejected");
+        assert!(
+            error.to_string().contains("auth"),
+            "the error must point at --auth, got: {error}"
+        );
     }
 
     #[test]

@@ -77,6 +77,7 @@ async fn start_mobilink_server() -> Mobilink {
         pipeline,
         transformer: Arc::new(ErudaInjector),
         options: tunnels,
+        public_url: public_base.clone().into(),
     });
     tokio::spawn(async move { axum::serve(http_listener, app).await.unwrap() });
 
@@ -95,6 +96,7 @@ async fn start_cli(server: &Mobilink, local_port: u16, no_eruda: bool) -> tunnel
         "localhost",
         local_port,
         no_eruda,
+        mobilink_core::auth::AuthMode::Passthrough,
     )
     .await
     .unwrap();

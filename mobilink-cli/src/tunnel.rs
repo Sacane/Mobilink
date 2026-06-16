@@ -8,6 +8,7 @@
 use std::net::SocketAddr;
 use std::time::Instant;
 
+use mobilink_core::auth::AuthMode;
 use mobilink_core::http::HttpRequestData;
 use mobilink_core::message::{ClientMessage, ServerMessage};
 use mobilink_core::session::SessionId;
@@ -29,6 +30,7 @@ pub async fn connect_and_handshake(
     server_name: &str,
     local_port: u16,
     no_eruda: bool,
+    auth: AuthMode,
 ) -> Result<TunnelSession, Box<dyn std::error::Error>> {
     let connection = endpoint.connect(server_addr, server_name)?.await?;
 
@@ -36,6 +38,7 @@ pub async fn connect_and_handshake(
     let hello = ClientMessage::Hello {
         local_port,
         no_eruda,
+        auth,
     };
     send.write_all(&wire::encode(&hello)?).await?;
     send.finish()?;

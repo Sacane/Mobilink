@@ -48,6 +48,15 @@ pub trait HttpRouter: Send + Sync {
 pub trait SessionOptions: Send + Sync {
     /// True when the developer started the CLI with `--no-eruda`.
     fn eruda_disabled(&self) -> bool;
+
+    /// The authentication mode the developer declared with `--auth`.
+    /// Drives how `Set-Cookie` headers are rewritten on the way back so the
+    /// session survives the hop through the public host. Defaults to
+    /// [`AuthMode::Passthrough`] (no rewriting) for any options source that
+    /// does not care about auth.
+    fn auth_mode(&self) -> mobilink_core::auth::AuthMode {
+        mobilink_core::auth::AuthMode::Passthrough
+    }
 }
 
 /// Transforms an HTTP response on its way back to the mobile browser.

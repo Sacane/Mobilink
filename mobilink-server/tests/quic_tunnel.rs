@@ -57,6 +57,7 @@ async fn handshake(connection: &quinn::Connection, no_eruda: bool) -> ServerMess
     let hello = ClientMessage::Hello {
         local_port: 3000,
         no_eruda,
+        auth: mobilink_core::auth::AuthMode::Passthrough,
     };
     send.write_all(&wire::encode(&hello).unwrap())
         .await

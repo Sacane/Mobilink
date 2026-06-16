@@ -111,6 +111,7 @@ Scan the QR code displayed in the terminal from your phone.
 | QR code in the terminal | MVP |
 | Real-time request inspector | MVP |
 | Automatic Eruda injection | MVP |
+| Auth-aware proxying (`X-Forwarded-*`, credential-safe CORS, `--auth cookie`) | MVP |
 | Multi-port sessions | Post-MVP |
 | Authentication / access control | Post-MVP |
 | Web dashboard | Post-MVP |

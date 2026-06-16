@@ -66,6 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pipeline,
         transformer: Arc::new(ErudaInjector),
         options: tunnels,
+        public_url: config.public_url.clone().into(),
     });
     let listener = tokio::net::TcpListener::bind(&config.http_bind).await?;
     tracing::info!(addr = %config.http_bind, public_url = %config.public_url, "public HTTP endpoint listening");

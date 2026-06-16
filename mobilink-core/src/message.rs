@@ -1,3 +1,4 @@
+use crate::auth::AuthMode;
 use crate::session::SessionId;
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +15,9 @@ pub enum ClientMessage {
         local_port: u16,
         /// When true, the server must not inject the Eruda debug script.
         no_eruda: bool,
+        /// How the server should adapt cookies/headers to the local app's
+        /// authentication scheme (declared with `--auth`).
+        auth: AuthMode,
     },
 }
 
